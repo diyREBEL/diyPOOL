@@ -276,7 +276,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 /* =========================================================
    Grundeinstellungen
    ========================================================= */
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.1';
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 const DEFAULT_CATS = [
@@ -550,6 +550,22 @@ function extractJson(text) {
   try { return JSON.parse(text.slice(a, b + 1)); } catch (e) { return null; }
 }
 
+// Wandelt ein Tool-Schema in ein Schema für Structured Outputs um:
+// jedes Objekt erhält additionalProperties:false, nicht unterstützte Zahlen-/Längengrenzen werden entfernt.
+function strictSchema(node) {
+  if (Array.isArray(node)) return node.map(strictSchema);
+  if (!node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [k, v] of Object.entries(node)) {
+    if (['minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'minLength', 'maxLength', 'maxItems'].includes(k)) continue;
+    out[k] = (k === 'properties')
+      ? Object.fromEntries(Object.entries(v).map(([pk, pv]) => [pk, strictSchema(pv)]))
+      : strictSchema(v);
+  }
+  if (out.type === 'object') out.additionalProperties = false;
+  return out;
+}
+
 async function callClaude({ system, content, tool, maxTokens = 1024, timeoutMs = 120000 }) {
   const key = (state.settings.apiKey || '').trim();
   if (!key) throw new AppError('Es ist kein API-Schlüssel hinterlegt. Bitte zuerst in den Einstellungen eintragen.');
@@ -557,7 +573,7 @@ async function callClaude({ system, content, tool, maxTokens = 1024, timeoutMs =
 
   const body = { model: currentModel(), max_tokens: maxTokens, messages: [{ role: 'user', content }] };
   if (system) body.system = system;
-  if (tool) { body.tools = [tool]; body.tool_choice = { type: 'tool', name: tool.name }; }
+  if (tool) body.output_config = { format: { type: 'json_schema', schema: strictSchema(tool.input_schema) } };
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -584,14 +600,13 @@ async function callClaude({ system, content, tool, maxTokens = 1024, timeoutMs =
   try { data = await res.json(); } catch (e) { /* keine JSON-Antwort */ }
   if (!res.ok) throw new AppError(apiErrorMessage(res.status, data));
   if (!data || !Array.isArray(data.content)) throw new AppError('Die Antwort der KI war unvollständig.');
-  if (data.stop_reason === 'max_tokens') throw new AppError('Die Antwort der KI wurde abgeschnitten, weil sie zu lang war. Bitte die Anfrage kürzen.');
-
   if (!tool) return data;
-  const block = data.content.find(b => b.type === 'tool_use' && b.name === tool.name);
-  if (block && block.input) return block.input;
-  const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
-  const parsed = extractJson(text);
-  if (parsed) return parsed;
+  if (data.stop_reason === 'refusal') throw new AppError('Die KI hat die Anfrage abgelehnt. Bitte mit einem anderen Foto oder Text erneut versuchen.');
+  if (data.stop_reason === 'max_tokens') throw new AppError('Die Antwort der KI wurde abgeschnitten, weil sie zu lang war. Bitte die Anfrage kürzen oder erneut versuchen.');
+  const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+  let parsed = null;
+  try { parsed = JSON.parse(text); } catch (e) { parsed = extractJson(text); }
+  if (parsed && typeof parsed === 'object') return parsed;
   throw new AppError('Die Antwort der KI konnte nicht ausgewertet werden. Bitte erneut versuchen.');
 }
 
@@ -667,6 +682,11 @@ function recognitionTool() {
   };
 }
 
+function matchCategory(c) {
+  const v = String(c || '').trim();
+  return state.categories.find(x => norm(x) === norm(v)) || v;
+}
+
 async function handlePhoto(file) {
   if (!file) return;
   cap.phase = 'loading'; cap.error = null; cap.result = null; cap.img = null;
@@ -689,7 +709,8 @@ async function runRecognition() {
     const r = await callClaude({
       system: REC_SYSTEM,
       tool: recognitionTool(),
-      maxTokens: 1024,
+      maxTokens: 8000,
+      timeoutMs: 180000,
       content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: cap.b64 } },
         { type: 'text', text: `Kategorien: ${state.categories.join('; ')}\n\nAktuelles Inventar (ID | Name | Kategorie | Stückzahl | Kennwerte):\n${inventoryContext()}` }
@@ -698,9 +719,9 @@ async function runRecognition() {
     const res = {
       erkannt: r.erkannt !== false,
       name: String(r.name || '').trim(),
-      kategorie: String(r.kategorie || '').trim(),
+      kategorie: matchCategory(r.kategorie),
       stueckzahl: toInt(r.stueckzahl),
-      zaehlung: ['gezaehlt', 'geschaetzt', 'unsicher'].includes(r.zaehlung) ? r.zaehlung : 'unsicher',
+      zaehlung: ['gezaehlt', 'geschaetzt', 'unsicher'].includes(String(r.zaehlung || '').toLowerCase()) ? String(r.zaehlung).toLowerCase() : 'unsicher',
       kennwerte: String(r.kennwerte || '').trim(),
       match_id: byId(String(r.match_id || '')) ? String(r.match_id) : '',
       hinweis: String(r.hinweis || '').trim()
@@ -899,7 +920,8 @@ async function runCheck() {
     const r = await callClaude({
       system: checkSystem(chk.mode),
       tool: checkTool(),
-      maxTokens: 8000,
+      maxTokens: 16000,
+      timeoutMs: 240000,
       content: [{ type: 'text', text: `${chk.mode === 'liste' ? 'Stückliste' : 'Projektbeschreibung'}:\n${text}\n\nInventar (ID | Name | Kategorie | Stückzahl | Kennwerte):\n${inventoryContext()}` }]
     });
     if (!Array.isArray(r.positionen)) throw new AppError('Die Antwort der KI enthielt keine Positionen.');
@@ -1036,7 +1058,8 @@ async function runIdeas(more) {
     const r = await callClaude({
       system: ideaSystem(idea.strict),
       tool: ideaTool(),
-      maxTokens: 6000,
+      maxTokens: 16000,
+      timeoutMs: 240000,
       content: [{ type: 'text', text:
         `${wish ? 'Wünsche: ' + wish + '\n\n' : ''}${avoid.length ? 'Diese Vorschläge wurden bereits gemacht, bitte andere Ideen: ' + avoid.join('; ') + '\n\n' : ''}Inventar (ID | Name | Kategorie | Stückzahl | Kennwerte):\n${inventoryContext()}` }]
     });
@@ -1071,7 +1094,7 @@ function renderIdeas() {
       return { t, need, it, st };
     });
     const missing = parts.filter(p => p.st !== 'ok').length;
-    const diff = { einfach: 'einfach', mittel: 'mittel', anspruchsvoll: 'anspruchsvoll' }[x.schwierigkeit] || '';
+    const diff = { einfach: 'einfach', mittel: 'mittel', anspruchsvoll: 'anspruchsvoll' }[String(x.schwierigkeit || '').toLowerCase()] || '';
     html += `<div class="card idea">
       <h3>${esc(x.titel)}</h3>
       <div class="idea-meta">
@@ -1320,7 +1343,7 @@ $('#setView').addEventListener('click', async e => {
     if (key !== state.settings.apiKey) { state.settings.apiKey = key; saveSettings(); }
     t.disabled = true; t.textContent = 'Teste …';
     try {
-      await callClaude({ content: [{ type: 'text', text: 'Antworte nur mit OK.' }], maxTokens: 16, timeoutMs: 30000 });
+      await callClaude({ content: [{ type: 'text', text: 'Antworte nur mit OK.' }], maxTokens: 512, timeoutMs: 60000 });
       toast(`Verbindung erfolgreich (${currentModel()}).`);
     } catch (err) { toast(err.message, true); }
     t.disabled = false; t.textContent = 'Testen';

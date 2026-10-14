@@ -1,5 +1,5 @@
 // diyPOOL Service Worker: Netzwerk zuerst, bei fehlender Verbindung aus dem Zwischenspeicher.
-const CACHE = 'diypool-v1';
+const CACHE = 'diypool-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -16,7 +16,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   e.respondWith(
-    fetch(req)
+    fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
       .then(res => {
         if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
         return res;
