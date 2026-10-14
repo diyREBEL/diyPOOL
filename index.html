@@ -135,6 +135,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .radio input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--accent);flex:0 0 auto}
 .indent{margin:2px 0 8px 30px}
 .dim{opacity:.45}
+.caphead{padding:0 0 4px;align-items:flex-start}
+.caphead b{font-size:16.5px}
+.capsub{display:block;font-weight:400;margin-top:1px}
+.capbody{margin-top:10px}
+.capitem.off .capbody{display:none}
+.capitem.off .caphead b{color:var(--muted);font-weight:500;text-decoration:line-through}
+.capmerge{border-top:1px solid var(--line);margin-top:4px;padding-top:8px}
 .spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--chip);border-top-color:var(--accent);animation:spin .9s linear infinite;margin:6px auto 12px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -276,7 +283,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 /* =========================================================
    Grundeinstellungen
    ========================================================= */
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 const DEFAULT_CATS = [
@@ -299,7 +306,8 @@ const TAB_TITLES = { inventar: 'Inventar', erfassen: 'Erfassen', pruefen: 'Mater
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 class AppError extends Error {}
-const uid = () => Date.now().toString(36).slice(-6) + Math.random().toString(36).slice(2, 6);
+let uidSeq = 0;
+const uid = () => Date.now().toString(36).slice(-6) + (uidSeq++ % 1296).toString(36).padStart(2, '0') + Math.random().toString(36).slice(2, 5);
 const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 const fmtDate = ts => ts ? new Date(ts).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' }) : 'noch nie';
 const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; };
@@ -619,9 +627,9 @@ function inventoryContext() {
 /* =========================================================
    Erfassen
    ========================================================= */
-const cap = { phase: 'idle', img: null, b64: null, result: null, error: null, local: null };
+const cap = { phase: 'idle', img: null, b64: null, items: null, note: '', erkannt: true, error: null };
 
-function resetCapture() { Object.assign(cap, { phase: 'idle', img: null, b64: null, result: null, error: null, local: null }); renderCapture(); }
+function resetCapture() { Object.assign(cap, { phase: 'idle', img: null, b64: null, items: null, note: '', erkannt: true, error: null }); renderCapture(); }
 
 function loadImage(file) {
   return new Promise((resolve, reject) => {
@@ -650,34 +658,47 @@ async function prepareImage(file) {
 }
 
 const REC_SYSTEM = `Du hilfst beim Inventarisieren eines privaten Lagers mit Elektronikbauteilen, Hardware, Mechanikteilen, Werkzeug und Verbrauchsmaterial.
-Das Foto zeigt genau einen Bauteiltyp, eventuell in mehreren Exemplaren.
+Das Foto kann einen einzigen oder mehrere verschiedene Bauteiltypen zeigen.
 
 Vorgehen:
-1. Bestimme das Bauteil und gib eine kurze, eindeutige deutsche Bezeichnung an, wie man sie in einem Inventar verwendet, z. B. «Widerstand 220 Ω», «ESP32-DevKitC V4», «Kreuzschlitz-Schraubendreher PH1», «Zylinderkopfschraube M3×10». Verwende die Schweizer Schreibweise (ss statt ß).
-2. Wähle die passendste Kategorie aus der vorgegebenen Liste.
-3. Zähle die sichtbaren Exemplare dieses Bauteiltyps. Wenn Teile verdeckt, gestapelt oder verpackt sind, schätze und setze zaehlung auf «geschaetzt» oder bei grosser Unsicherheit auf «unsicher». Steht auf einer Verpackung eine Menge, darfst du diese verwenden und das im Hinweis erwähnen.
-4. Notiere technische Kennwerte, die auf dem Foto tatsächlich erkennbar sind (Aufdruck, Bauform, Gewinde, Länge, Farbringe). Erfinde nichts. Was nicht erkennbar ist, lässt du weg. Ist ein Wert nur vermutet, schreibe «vermutlich» davor. Farben von Widerstandsringen sind auf Fotos oft verfälscht: Gib einen Widerstandswert nur an, wenn die Ringe klar lesbar sind, sonst weise darauf hin.
-5. Prüfe, ob das Bauteil bereits im Inventar steht. Setze match_id nur, wenn es eindeutig derselbe Bauteiltyp mit denselben Kennwerten ist, sonst einen leeren String. Erfinde keine IDs.
-6. Schreibe in hinweis kurz, was unsicher ist oder was die Person prüfen sollte. Leer lassen, wenn nichts zu beachten ist.
-Ist auf dem Foto kein Bauteil, Material oder Werkzeug erkennbar, setze erkannt auf false und erkläre im Hinweis kurz, warum.`;
+1. Unterscheide alle Bauteiltypen auf dem Foto. Jeder Typ wird ein eigener Eintrag in bauteile. Trenne nach allem, was für ein Inventar wichtig ist: LEDs nach Farbe, Grösse und Bauform, Widerstände nach Wert, Kondensatoren nach Kapazität, Schrauben nach Gewinde und Länge, Module nach Typ. Gleiche Teile fasst du in einem Eintrag zusammen. Jedes Teil wird nur in einem Eintrag gezählt.
+2. Gib jedem Typ eine kurze, eindeutige deutsche Bezeichnung, wie man sie in einem Inventar verwendet, z. B. «Widerstand 220 Ω», «LED rot 5 mm», «ESP32-DevKitC V4», «Zylinderkopfschraube M3×10». Verwende die Schweizer Schreibweise (ss statt ß).
+3. Wähle pro Typ die passendste Kategorie aus der vorgegebenen Liste.
+4. Zähle pro Typ die sichtbaren Exemplare. Wenn Teile verdeckt, gestapelt oder verpackt sind, schätze und setze zaehlung auf «geschaetzt» oder bei grosser Unsicherheit auf «unsicher». Steht auf einer Verpackung eine Menge, darfst du diese verwenden und das im Hinweis erwähnen.
+5. Notiere pro Typ technische Kennwerte, die auf dem Foto tatsächlich erkennbar sind (Aufdruck, Bauform, Gewinde, Länge, Farbringe). Erfinde nichts. Was nicht erkennbar ist, lässt du weg. Ist ein Wert nur vermutet, schreibe «vermutlich» davor. Farben von Widerstandsringen sind auf Fotos oft verfälscht: Gib einen Widerstandswert nur an, wenn die Ringe klar lesbar sind, sonst weise darauf hin.
+6. Beschreibe in ort kurz, wo der Typ auf dem Foto liegt (z. B. «oben links», «mittlere Reihe»), damit die Person die Einträge auf dem Foto wiederfindet. Ordne die Einträge von oben links nach unten rechts.
+7. Prüfe pro Typ, ob er bereits im Inventar steht. Setze match_id nur, wenn es eindeutig derselbe Bauteiltyp mit denselben Kennwerten ist, sonst einen leeren String. Erfinde keine IDs.
+8. Schreibe in den hinweis eines Typs kurz, was bei diesem Typ unsicher ist. Im übergeordneten hinweis vermerkst du, wenn Typen nicht sicher unterscheidbar sind oder Teile verdeckt sein könnten. Leer lassen, wenn nichts zu beachten ist.
+Ist auf dem Foto kein Bauteil, Material oder Werkzeug erkennbar, setze erkannt auf false, lasse bauteile leer und erkläre im übergeordneten Hinweis kurz, warum.`;
 
 function recognitionTool() {
   return {
-    name: 'bauteil_erfassen',
-    description: 'Gibt das auf dem Foto erkannte Bauteil zurück.',
+    name: 'bauteile_erfassen',
+    description: 'Gibt die auf dem Foto erkannten Bauteiltypen zurück.',
     input_schema: {
       type: 'object',
       properties: {
         erkannt: { type: 'boolean', description: 'false, wenn kein Bauteil, Material oder Werkzeug erkennbar ist' },
-        name: { type: 'string', description: 'Kurze deutsche Inventarbezeichnung' },
-        kategorie: { type: 'string', enum: state.categories.slice() },
-        stueckzahl: { type: 'integer', minimum: 0 },
-        zaehlung: { type: 'string', enum: ['gezaehlt', 'geschaetzt', 'unsicher'] },
-        kennwerte: { type: 'string', description: 'Erkennbare technische Kennwerte, sonst leer' },
-        match_id: { type: 'string', description: 'ID eines identischen bestehenden Inventareintrags, sonst leerer String' },
-        hinweis: { type: 'string', description: 'Kurzer Hinweis zu Unsicherheiten, sonst leer' }
+        hinweis: { type: 'string', description: 'Übergeordneter Hinweis zum ganzen Foto, sonst leer' },
+        bauteile: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Kurze deutsche Inventarbezeichnung' },
+              kategorie: { type: 'string', enum: state.categories.slice() },
+              stueckzahl: { type: 'integer', minimum: 0 },
+              zaehlung: { type: 'string', enum: ['gezaehlt', 'geschaetzt', 'unsicher'] },
+              kennwerte: { type: 'string', description: 'Erkennbare technische Kennwerte, sonst leer' },
+              ort: { type: 'string', description: 'Kurze Lagebeschreibung auf dem Foto' },
+              match_id: { type: 'string', description: 'ID eines identischen bestehenden Inventareintrags, sonst leerer String' },
+              hinweis: { type: 'string', description: 'Kurzer Hinweis zu Unsicherheiten bei diesem Typ, sonst leer' }
+            },
+            required: ['name', 'kategorie', 'stueckzahl', 'zaehlung', 'kennwerte', 'ort', 'match_id', 'hinweis']
+          }
+        }
       },
-      required: ['erkannt', 'name', 'kategorie', 'stueckzahl', 'zaehlung', 'kennwerte', 'match_id', 'hinweis']
+      required: ['erkannt', 'hinweis', 'bauteile']
     }
   };
 }
@@ -689,7 +710,7 @@ function matchCategory(c) {
 
 async function handlePhoto(file) {
   if (!file) return;
-  cap.phase = 'loading'; cap.error = null; cap.result = null; cap.img = null;
+  cap.phase = 'loading'; cap.error = null; cap.items = null; cap.img = null;
   renderCapture();
   try {
     const { dataUrl, b64 } = await prepareImage(file);
@@ -702,6 +723,10 @@ async function handlePhoto(file) {
   }
 }
 
+function emptyCapItem() {
+  return { sel: true, name: '', kategorie: state.categories[0], stueckzahl: 1, zaehlung: 'unsicher', kennwerte: '', ort: '', hinweis: '', matched: false, mode: 'new', target: '' };
+}
+
 async function runRecognition() {
   cap.phase = 'loading'; cap.error = null;
   renderCapture();
@@ -709,29 +734,40 @@ async function runRecognition() {
     const r = await callClaude({
       system: REC_SYSTEM,
       tool: recognitionTool(),
-      maxTokens: 8000,
+      maxTokens: 12000,
       timeoutMs: 180000,
       content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: cap.b64 } },
         { type: 'text', text: `Kategorien: ${state.categories.join('; ')}\n\nAktuelles Inventar (ID | Name | Kategorie | Stückzahl | Kennwerte):\n${inventoryContext()}` }
       ]
     });
-    const res = {
-      erkannt: r.erkannt !== false,
-      name: String(r.name || '').trim(),
-      kategorie: matchCategory(r.kategorie),
-      stueckzahl: toInt(r.stueckzahl),
-      zaehlung: ['gezaehlt', 'geschaetzt', 'unsicher'].includes(String(r.zaehlung || '').toLowerCase()) ? String(r.zaehlung).toLowerCase() : 'unsicher',
-      kennwerte: String(r.kennwerte || '').trim(),
-      match_id: byId(String(r.match_id || '')) ? String(r.match_id) : '',
-      hinweis: String(r.hinweis || '').trim()
-    };
-    // Rückfall: lokaler Abgleich über identischen Namen
-    if (!res.match_id && res.name) {
-      const same = state.items.find(i => norm(i.name) === norm(res.name) && norm(i.kennwerte) === norm(res.kennwerte));
-      if (same) res.match_id = same.id;
-    }
-    cap.result = res; cap.phase = 'preview';
+    const list = Array.isArray(r.bauteile) ? r.bauteile : [];
+    const hasInv = state.items.length > 0;
+    cap.items = list.map(b => {
+      const it = {
+        sel: true,
+        name: String(b.name || '').trim(),
+        kategorie: matchCategory(b.kategorie) || state.categories[0],
+        stueckzahl: toInt(b.stueckzahl),
+        zaehlung: ['gezaehlt', 'geschaetzt', 'unsicher'].includes(String(b.zaehlung || '').toLowerCase()) ? String(b.zaehlung).toLowerCase() : 'unsicher',
+        kennwerte: String(b.kennwerte || '').trim(),
+        ort: String(b.ort || '').trim(),
+        hinweis: String(b.hinweis || '').trim(),
+        target: byId(String(b.match_id || '')) ? String(b.match_id) : ''
+      };
+      // Rückfall: lokaler Abgleich über identischen Namen und Kennwerte
+      if (!it.target && it.name) {
+        const same = state.items.find(i => norm(i.name) === norm(it.name) && norm(i.kennwerte) === norm(it.kennwerte));
+        if (same) it.target = same.id;
+      }
+      it.matched = !!it.target;
+      it.mode = hasInv && it.target ? 'add' : 'new';
+      return it;
+    }).filter(it => it.name || it.stueckzahl);
+    cap.erkannt = r.erkannt !== false && cap.items.length > 0;
+    cap.note = String(r.hinweis || '').trim();
+    if (!cap.items.length) cap.items = [emptyCapItem()];
+    cap.phase = 'preview';
   } catch (e) {
     cap.phase = 'error'; cap.error = e instanceof AppError ? e.message : 'Unerwarteter Fehler: ' + e.message;
   }
@@ -739,6 +775,34 @@ async function runRecognition() {
 }
 
 const ICON_CAM = '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.8"/></svg>';
+const ZAEHL = { gezaehlt: ['ok', 'gezählt'], geschaetzt: ['warn', 'geschätzt, bitte prüfen'], unsicher: ['bad', 'unsicher, bitte nachzählen'] };
+
+function capItemHtml(it, i, hasInv, targetList) {
+  const z = ZAEHL[it.zaehlung] || ZAEHL.unsicher;
+  const opts = targetList.map(t => `<option value="${esc(t.id)}"${t.id === it.target ? ' selected' : ''}>${esc(t.label)}</option>`).join('');
+  return `<div class="card capitem${it.sel ? '' : ' off'}" data-i="${i}">
+    <label class="radio caphead"><input type="checkbox" data-f="sel"${it.sel ? ' checked' : ''}>
+      <span><b class="capttl">${esc(it.name || 'Bauteil ' + (i + 1))}</b>${it.ort ? `<span class="small muted capsub">${esc(it.ort)}</span>` : ''}</span></label>
+    <div class="capbody">
+      ${it.hinweis ? `<p class="note warn" style="margin:0 0 12px">${esc(it.hinweis)}</p>` : ''}
+      <div class="capfields">
+        <label class="field"><span>Name</span><input type="text" data-f="name" value="${esc(it.name)}" autocomplete="off"></label>
+        <label class="field"><span>Kategorie</span><select data-f="kategorie">${categoryOptions(it.kategorie)}</select></label>
+      </div>
+      <div class="field"><span>Stückzahl ${cap.erkannt ? `<span class="badge ${z[0]}">${z[1]}</span>` : ''}</span>${qtyHtml('capQty-' + i, it.stueckzahl)}</div>
+      <label class="field capkenn"><span>Technische Kennwerte</span><textarea data-f="kennwerte" rows="2">${esc(it.kennwerte)}</textarea></label>
+      ${hasInv ? `<div class="capmerge">
+        ${it.matched ? '<p class="small muted" style="margin:0 0 2px">Passender Eintrag im Inventar gefunden.</p>' : ''}
+        <label class="radio"><input type="radio" name="capMode-${i}" value="add" data-f="mode"${it.mode === 'add' ? ' checked' : ''}>Zu bestehendem Eintrag addieren</label>
+        <div class="indent">
+          <select data-f="target">${it.target ? '' : '<option value="">Eintrag wählen …</option>'}${opts}</select>
+          <p class="small muted capinfo" style="margin:6px 2px 0"></p>
+        </div>
+        <label class="radio"><input type="radio" name="capMode-${i}" value="new" data-f="mode"${it.mode === 'new' ? ' checked' : ''}>Als neuen Eintrag anlegen</label>
+      </div>` : ''}
+    </div>
+  </div>`;
+}
 
 function renderCapture() {
   const v = $('#capView');
@@ -748,7 +812,7 @@ function renderCapture() {
     v.innerHTML = `
       ${noKey ? `<div class="card"><h3>API-Schlüssel fehlt</h3><p class="small" style="margin:0 0 10px">Für die Erkennung per Foto braucht diyPOOL deinen Anthropic-API-Schlüssel.</p><button type="button" class="btn block" data-go="einstellungen">Zu den Einstellungen</button></div>` : ''}
       <div class="card center">
-        <p class="lead">Ein Bauteiltyp pro Foto. Teile möglichst nebeneinander auf einen ruhigen, hellen Hintergrund legen, damit sie gezählt werden können.</p>
+        <p class="lead">Ein oder mehrere Bauteiltypen pro Foto. Verschiedene Typen sichtbar getrennt hinlegen, z. B. in Reihen oder Häufchen, auf einem ruhigen, hellen Hintergrund.</p>
         <label class="btn primary big" for="camInput">${ICON_CAM}Foto aufnehmen</label>
         <div style="height:10px"></div>
         <label class="btn block" for="libInput">Aus Fotos wählen</label>
@@ -761,7 +825,7 @@ function renderCapture() {
     v.innerHTML = `<div class="card center">
       ${cap.img ? `<img class="thumb" src="${cap.img}" alt="Aufgenommenes Foto">` : ''}
       <div class="spinner"></div>
-      <p class="muted" style="margin:0">${cap.img ? 'Bauteil wird erkannt …' : 'Foto wird vorbereitet …'}</p>
+      <p class="muted" style="margin:0">${cap.img ? 'Bauteile werden erkannt …' : 'Foto wird vorbereitet …'}</p>
     </div>`;
     return;
   }
@@ -781,84 +845,82 @@ function renderCapture() {
     return;
   }
 
-  // Vorschau
-  const r = cap.result;
-  const z = { gezaehlt: ['ok', 'gezählt'], geschaetzt: ['warn', 'geschätzt, bitte prüfen'], unsicher: ['bad', 'unsicher, bitte nachzählen'] }[r.zaehlung];
-  const match = byId(r.match_id);
-  const hasItems = state.items.length > 0;
-  const mode = match ? 'add' : 'new';
-  const targetOpts = sortedItems().map(i => {
-    const kw = i.kennwerte ? ' – ' + (i.kennwerte.length > 30 ? i.kennwerte.slice(0, 30) + '…' : i.kennwerte) : '';
-    return `<option value="${esc(i.id)}"${match && i.id === match.id ? ' selected' : ''}>${esc(i.name + kw)} (${i.stueckzahl} Stk.)</option>`;
-  }).join('');
-
+  // Vorschau mit einer Karte pro erkanntem Bauteiltyp
+  const hasInv = state.items.length > 0;
+  const targetList = sortedItems().map(t => {
+    const kw = t.kennwerte ? ' – ' + (t.kennwerte.length > 30 ? t.kennwerte.slice(0, 30) + '…' : t.kennwerte) : '';
+    return { id: t.id, label: `${t.name}${kw} (${t.stueckzahl} Stk.)` };
+  });
+  const n = cap.erkannt ? cap.items.length : 0;
   v.innerHTML = `
     <div class="card">
       <img class="thumb" src="${cap.img}" alt="Aufgenommenes Foto">
-      ${!r.erkannt ? '<p class="note bad" style="margin:0 0 12px">Auf dem Foto wurde kein Bauteil erkannt. Du kannst die Felder selbst ausfüllen oder ein neues Foto machen.</p>' : ''}
-      ${r.hinweis ? `<p class="note warn" style="margin:0 0 12px">${esc(r.hinweis)}</p>` : ''}
-      <div id="capFields">
-        <label class="field"><span>Name</span><input id="capName" type="text" value="${esc(r.name)}" autocomplete="off"></label>
-        <label class="field"><span>Kategorie</span><select id="capCat">${categoryOptions(r.kategorie || state.categories[0])}</select></label>
-      </div>
-      <div class="field"><span>Stückzahl ${r.erkannt ? `<span class="badge ${z[0]}">${z[1]}</span>` : ''}</span>${qtyHtml('capQty', r.stueckzahl)}</div>
-      <label class="field" id="capKennWrap"><span>Technische Kennwerte</span><textarea id="capKenn" rows="3">${esc(r.kennwerte)}</textarea></label>
-      <button type="button" class="btn small" data-act="retry">Erneut erkennen</button>
+      ${cap.erkannt
+        ? `<p style="margin:0;font-weight:600">${n} ${n === 1 ? 'Bauteiltyp' : 'Bauteiltypen'} erkannt</p><p class="small muted" style="margin:2px 0 0">Bitte prüfen und nicht Passendes abwählen.</p>`
+        : '<p class="note bad" style="margin:0">Auf dem Foto wurde kein Bauteil erkannt. Du kannst die Felder selbst ausfüllen oder ein neues Foto machen.</p>'}
+      ${cap.note ? `<p class="note warn">${esc(cap.note)}</p>` : ''}
+      <button type="button" class="btn small" data-act="retry" style="margin-top:12px">Erneut erkennen</button>
     </div>
-    ${hasItems ? `
-    <div class="card">
-      <h3>Speichern als</h3>
-      ${match ? '<p class="small muted" style="margin:-4px 0 6px">Die KI hat einen passenden Eintrag gefunden.</p>' : ''}
-      <label class="radio"><input type="radio" name="capMode" value="add"${mode === 'add' ? ' checked' : ''}>Zu bestehendem Eintrag addieren</label>
-      <div class="indent">
-        <select id="capTarget">${match ? '' : '<option value="">Eintrag wählen …</option>'}${targetOpts}</select>
-        <p class="small muted" id="capTargetInfo" style="margin:6px 2px 0"></p>
-      </div>
-      <label class="radio"><input type="radio" name="capMode" value="new"${mode === 'new' ? ' checked' : ''}>Als neuen Eintrag anlegen</label>
-    </div>` : ''}
-    <div class="btnrow"><button type="button" class="btn" data-act="discard">Verwerfen</button><button type="button" class="btn primary" data-act="save">Speichern</button></div>`;
+    ${cap.items.map((it, i) => capItemHtml(it, i, hasInv, targetList)).join('')}
+    <div class="btnrow"><button type="button" class="btn" data-act="discard">Verwerfen</button><button type="button" class="btn primary" data-act="save" id="capSaveBtn">Speichern</button></div>`;
   updateCaptureInfo();
 }
 
-function captureMode() {
-  const r = document.querySelector('input[name=capMode]:checked');
-  return r ? r.value : 'new';
-}
-
 function updateCaptureInfo() {
-  if (cap.phase !== 'preview') return;
-  const mode = captureMode();
-  const add = mode === 'add';
-  ['capFields', 'capKennWrap'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle('dim', add); });
-  const info = $('#capTargetInfo');
-  const sel = $('#capTarget');
-  if (sel) sel.disabled = !add;
-  if (!info) return;
-  const t = sel ? byId(sel.value) : null;
-  const q = readQty('capQty');
-  info.textContent = add
-    ? (t ? `Bestand: ${t.stueckzahl} → ${t.stueckzahl + q} Stk. Name und Kennwerte des Eintrags bleiben unverändert.` : 'Bitte einen Eintrag wählen.')
-    : '';
+  if (cap.phase !== 'preview' || !cap.items) return;
+  const hasInv = state.items.length > 0;
+  // Summe pro Zieleintrag über alle ausgewählten Karten
+  const sums = {};
+  cap.items.forEach(it => { if (it.sel && hasInv && it.mode === 'add' && it.target) sums[it.target] = (sums[it.target] || 0) + it.stueckzahl; });
+  cap.items.forEach((it, i) => {
+    const card = document.querySelector(`.capitem[data-i="${i}"]`);
+    if (!card) return;
+    card.classList.toggle('off', !it.sel);
+    const add = hasInv && it.mode === 'add';
+    card.querySelectorAll('.capfields, .capkenn').forEach(el => el.classList.toggle('dim', add));
+    const sel = card.querySelector('[data-f=target]');
+    if (sel) sel.disabled = !add;
+    const info = card.querySelector('.capinfo');
+    if (!info) return;
+    const t = byId(it.target);
+    if (!add) { info.textContent = ''; return; }
+    if (!t) { info.textContent = 'Bitte einen Eintrag wählen.'; return; }
+    const total = sums[t.id] || it.stueckzahl;
+    info.textContent = `Bestand: ${t.stueckzahl} → ${t.stueckzahl + total} Stk.${total !== it.stueckzahl ? ' (zusammen mit einer weiteren Karte)' : ''} Name und Kennwerte des Eintrags bleiben unverändert.`;
+  });
+  const btn = $('#capSaveBtn');
+  if (btn) {
+    const c = cap.items.filter(x => x.sel).length;
+    btn.disabled = c === 0;
+    btn.textContent = c === 0 ? 'Nichts ausgewählt' : c === 1 ? 'Speichern' : `${c} Einträge speichern`;
+  }
 }
 
 function saveCapture() {
-  const mode = captureMode();
-  const qty = readQty('capQty');
-  if (mode === 'add') {
-    const t = byId($('#capTarget') && $('#capTarget').value);
-    if (!t) { alert('Bitte einen bestehenden Eintrag wählen oder «Als neuen Eintrag anlegen» auswählen.'); return; }
-    if (qty <= 0) { alert('Die Stückzahl muss grösser als 0 sein.'); return; }
-    t.stueckzahl += qty; t.geaendert = Date.now();
-    saveData();
-    toast(`${t.name}: +${qty} (jetzt ${t.stueckzahl} Stk.)`);
-  } else {
-    const name = $('#capName').value.trim();
-    if (!name) { alert('Bitte einen Namen eingeben.'); return; }
-    const it = sanitizeItem({ id: uid(), name, kategorie: $('#capCat').value, stueckzahl: qty, kennwerte: $('#capKenn').value.trim() });
-    state.items.push(it);
-    saveData();
-    toast(`Gespeichert: ${it.name} (${qty} Stk.)`);
+  const hasInv = state.items.length > 0;
+  const chosen = cap.items.map((it, i) => ({ it, i })).filter(x => x.it.sel);
+  if (!chosen.length) { alert('Es ist kein Bauteil ausgewählt.'); return; }
+  for (const { it, i } of chosen) {
+    const label = chosen.length > 1 || cap.items.length > 1 ? `${it.name || 'Bauteil ' + (i + 1)}: ` : '';
+    if (hasInv && it.mode === 'add') {
+      if (!byId(it.target)) { alert(`${label}Bitte einen bestehenden Eintrag wählen oder «Als neuen Eintrag anlegen» auswählen.`); return; }
+      if (it.stueckzahl <= 0) { alert(`${label}Die Stückzahl muss grösser als 0 sein.`); return; }
+    } else if (!it.name.trim()) { alert(`${label}Bitte einen Namen eingeben.`); return; }
   }
+  let added = 0, created = 0, last = '';
+  for (const { it } of chosen) {
+    if (hasInv && it.mode === 'add') {
+      const t = byId(it.target);
+      t.stueckzahl += it.stueckzahl; t.geaendert = Date.now(); added++;
+      last = `${t.name}: +${it.stueckzahl} (jetzt ${t.stueckzahl} Stk.)`;
+    } else {
+      const n = sanitizeItem({ id: uid(), name: it.name.trim(), kategorie: it.kategorie, stueckzahl: it.stueckzahl, kennwerte: it.kennwerte.trim() });
+      state.items.push(n); created++;
+      last = `Gespeichert: ${n.name} (${n.stueckzahl} Stk.)`;
+    }
+  }
+  saveData();
+  toast(chosen.length === 1 ? last : `${chosen.length} Bauteiltypen gespeichert: ${created} neu, ${added} ergänzt.`);
   resetCapture();
 }
 
@@ -1298,16 +1360,34 @@ $('#invList').addEventListener('click', e => {
 $('#capView').addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   const act = a.dataset.act;
-  if (act === 'manual') {
-    const pre = cap.result ? { name: $('#capName') ? $('#capName').value : cap.result.name, kategorie: cap.result.kategorie, stueckzahl: cap.result.stueckzahl, kennwerte: cap.result.kennwerte } : null;
-    openItemEditor(null, pre);
-  }
+  if (act === 'manual') openItemEditor(null);
   else if (act === 'retry') runRecognition();
   else if (act === 'discard') resetCapture();
   else if (act === 'save') saveCapture();
 });
-$('#capView').addEventListener('change', e => { if (e.target.name === 'capMode' || e.target.id === 'capTarget') updateCaptureInfo(); });
-$('#capView').addEventListener('input', e => { if (e.target.id === 'capQty') updateCaptureInfo(); });
+function capItemFromEvent(e) {
+  const card = e.target.closest('.capitem');
+  return card && cap.items ? { card, it: cap.items[Number(card.dataset.i)] } : null;
+}
+$('#capView').addEventListener('input', e => {
+  const x = capItemFromEvent(e); if (!x) return;
+  const f = e.target.dataset.f;
+  if (f === 'name') { x.it.name = e.target.value; const h = x.card.querySelector('.capttl'); if (h) h.textContent = e.target.value.trim() || 'Bauteil ' + (Number(x.card.dataset.i) + 1); }
+  else if (f === 'kennwerte') x.it.kennwerte = e.target.value;
+  else if (e.target.id && e.target.id.startsWith('capQty-')) x.it.stueckzahl = toInt(e.target.value);
+  else return;
+  updateCaptureInfo();
+});
+$('#capView').addEventListener('change', e => {
+  const x = capItemFromEvent(e); if (!x) return;
+  const f = e.target.dataset.f;
+  if (f === 'sel') x.it.sel = e.target.checked;
+  else if (f === 'kategorie') x.it.kategorie = e.target.value;
+  else if (f === 'mode') x.it.mode = e.target.value;
+  else if (f === 'target') x.it.target = e.target.value;
+  else return;
+  updateCaptureInfo();
+});
 
 // Prüfen
 $('#chkView').addEventListener('input', e => { if (e.target.id === 'chkText') chk.text = e.target.value; });
