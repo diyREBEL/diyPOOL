@@ -1,0 +1,1387 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>diyPOOL</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="diyPOOL">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a5f69" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d2427" media="(prefers-color-scheme: dark)">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root{
+  --bg:#f2f2f7; --card:#ffffff; --text:#1c1c1e; --muted:#6c6c70; --line:#dcdce1;
+  --bar:#0a5f69; --accent:#0a7f8c; --accent-soft:#e0f2f4; --accent-text:#ffffff;
+  --ok:#1d7f46; --ok-soft:#e3f4ea; --warn:#9a5b00; --warn-soft:#fdf0d9;
+  --bad:#c0392b; --bad-soft:#fbe5e2; --chip:#e7e7ec; --tab:rgba(249,249,251,.94);
+  --input:#f4f4f7; --shadow:0 1px 2px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#000000; --card:#1c1c1e; --text:#f2f2f7; --muted:#9a9aa1; --line:#38383c;
+    --bar:#0d2427; --accent:#3cc0ce; --accent-soft:#12343a; --accent-text:#00262b;
+    --ok:#4cc97a; --ok-soft:#163222; --warn:#f0a63a; --warn-soft:#3a2a10;
+    --bad:#ff6b5e; --bad-soft:#3d1a17; --chip:#2c2c2f; --tab:rgba(18,18,20,.94);
+    --input:#2a2a2d; --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{touch-action:manipulation;cursor:pointer}
+[hidden]{display:none!important}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+
+/* Kopfzeile */
+.topbar{position:sticky;top:0;z-index:20;background:var(--bar);color:#fff;
+  padding:calc(env(safe-area-inset-top) + 8px) 16px 10px}
+.topbar-inner{max-width:720px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.brand{font-size:12px;font-weight:700;letter-spacing:.06em;opacity:.7}
+.topbar h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em;line-height:1.15}
+.banner{max-width:720px;margin:10px auto 0;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:rgba(255,255,255,.14);border-radius:10px;padding:8px 8px 8px 12px;font-size:14px}
+.banner button{background:#fff;color:var(--bar);border:0;border-radius:8px;padding:7px 12px;font-weight:600;font-size:14px;white-space:nowrap}
+@media (prefers-color-scheme: dark){ .banner button{color:#0d2427} }
+
+main{padding:14px 16px calc(92px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
+
+/* Tab-Leiste */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--tab);
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);
+  -webkit-backdrop-filter:saturate(180%) blur(14px);backdrop-filter:saturate(180%) blur(14px)}
+.tabbar-inner{display:flex;max-width:720px;margin:0 auto}
+.tabbar button{flex:1;background:none;border:0;padding:7px 0 5px;color:var(--muted);font-size:10.5px;font-weight:500;
+  display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabbar svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tabbar button.active{color:var(--accent)}
+
+/* Bausteine */
+.card{background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card h2,.card h3{margin:0 0 10px;font-size:17px;font-weight:650}
+.card.flush{padding:0;overflow:hidden}
+.muted{color:var(--muted)} .small{font-size:13.5px} .center{text-align:center}
+.lead{margin:0 0 14px;color:var(--muted);font-size:15px}
+.grouphead{margin:18px 4px 6px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.grouphead:first-child{margin-top:4px}
+.note{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:var(--accent-soft);font-size:14.5px}
+.note.warn{background:var(--warn-soft)} .note.bad{background:var(--bad-soft)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:11px;
+  padding:11px 16px;font-weight:600;font-size:16px;background:var(--chip);color:var(--text);text-decoration:none;min-height:44px}
+.btn.primary{background:var(--accent);color:var(--accent-text)}
+.btn.danger{background:var(--bad-soft);color:var(--bad)}
+.btn.block{display:flex;width:100%}
+.btn.big{padding:16px 20px;font-size:17px;width:100%}
+.btn.small{padding:7px 12px;font-size:14px;min-height:36px;border-radius:9px}
+.btn:disabled{opacity:.45}
+.btn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.btnrow{display:flex;gap:10px;margin-top:14px}
+.btnrow .btn{flex:1}
+.stack > * + *{margin-top:10px}
+.linkbtn{background:none;border:0;color:var(--accent);font-weight:600;font-size:15px;padding:10px 4px}
+
+.field{display:block;margin-bottom:12px}
+.field > span{display:block;font-size:13.5px;font-weight:600;color:var(--muted);margin:0 0 5px 2px}
+input[type=text],input[type=search],input[type=password],input[type=number],select,textarea{
+  width:100%;border:1px solid var(--line);background:var(--input);border-radius:10px;padding:11px 12px;font-size:16px;outline:none;
+  -webkit-appearance:none;appearance:none}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:34px}
+textarea{resize:vertical;min-height:80px;line-height:1.4}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.inline{display:flex;gap:8px;align-items:center}
+.inline input{flex:1}
+
+.qtyfield{display:flex;align-items:stretch;gap:8px}
+.qtyfield input{text-align:center;font-weight:650;font-size:18px;flex:1;min-width:0}
+.qbtn{width:52px;border:0;border-radius:10px;background:var(--chip);font-size:24px;font-weight:500;line-height:1}
+
+/* Suche, Chips */
+.searchbar{margin-bottom:10px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px;margin:0 -16px 4px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;border:0;border-radius:999px;padding:7px 12px;background:var(--chip);font-size:14px;font-weight:550;white-space:nowrap}
+.chip span{opacity:.6;margin-left:3px;font-weight:500}
+.chip.on{background:var(--accent);color:var(--accent-text)}
+.chip.on span{opacity:.85}
+
+/* Inventarliste */
+.row{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 16px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row-main{flex:1;min-width:0;background:none;border:0;text-align:left;padding:2px 0}
+.row-name{display:block;font-weight:600;font-size:16px;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
+.row-sub{display:block;font-size:13.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stepper{display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.stepper button{width:38px;height:38px;border:0;border-radius:10px;background:var(--chip);font-size:21px;line-height:1}
+.stepper button:disabled{opacity:.35}
+.qty{min-width:40px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.row.zero .qty{color:var(--bad)}
+.stats{margin:16px 0 0;text-align:center;color:var(--muted);font-size:13.5px}
+
+/* Erfassen */
+.thumb{display:block;width:100%;max-height:260px;object-fit:contain;border-radius:10px;background:var(--input);margin-bottom:12px}
+.badge{display:inline-block;font-size:12.5px;font-weight:600;border-radius:999px;padding:3px 9px;margin-left:6px;vertical-align:1px}
+.badge.ok{background:var(--ok-soft);color:var(--ok)} .badge.warn{background:var(--warn-soft);color:var(--warn)} .badge.bad{background:var(--bad-soft);color:var(--bad)}
+.radio{display:flex;align-items:flex-start;gap:10px;padding:8px 0;font-weight:550}
+.radio input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--accent);flex:0 0 auto}
+.indent{margin:2px 0 8px 30px}
+.dim{opacity:.45}
+.spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--chip);border-top-color:var(--accent);animation:spin .9s linear infinite;margin:6px auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Segment */
+.seg{display:flex;background:var(--chip);border-radius:11px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;border-radius:9px;padding:8px 6px;font-size:14.5px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+
+/* Prüfergebnis */
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.pill{font-size:13.5px;font-weight:650;border-radius:999px;padding:4px 10px}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.neutral{background:var(--chip);color:var(--muted)}
+.pos{display:flex;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}
+.pos:first-child{border-top:0}
+.dot{flex:0 0 auto;width:11px;height:11px;border-radius:50%;margin-top:6px}
+.dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+.pos-body{flex:1;min-width:0}
+.pos-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.pos-name{font-weight:600;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
+.pos-status{flex:0 0 auto;font-size:13px;font-weight:650}
+.pos-status.ok{color:var(--ok)} .pos-status.warn{color:var(--warn)} .pos-status.bad{color:var(--bad)}
+.pos-sub{font-size:13.5px;color:var(--muted);margin-top:2px;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
+.pos-alt{font-size:13.5px;margin-top:6px;padding:7px 10px;border-radius:9px;background:var(--accent-soft)}
+
+/* Ideen */
+.idea h3{margin-bottom:4px}
+.idea-meta{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.idea p{margin:0 0 10px;font-size:15px}
+.parts{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.parts li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.parts li:last-child{border-bottom:0}
+.parts .dot{margin-top:5px;width:9px;height:9px}
+.parts .pn{flex:1;min-width:0;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
+.parts .ps{flex:0 0 auto;font-size:13px;color:var(--muted)}
+
+/* Einstellungen */
+.catrow{display:flex;align-items:center;gap:6px;padding:8px 0;border-top:1px solid var(--line)}
+.catrow:first-of-type{border-top:0}
+.catrow .cn{flex:1;min-width:0;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
+.catrow .cc{color:var(--muted);font-size:13.5px;margin-right:4px;font-variant-numeric:tabular-nums}
+.iconbtn{width:38px;height:38px;border:0;border-radius:10px;background:var(--chip);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.iconbtn.danger{background:var(--bad-soft);color:var(--bad)}
+.iconbtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--line);font-size:15px}
+.kv:first-of-type{border-top:0}
+.kv span:last-child{color:var(--muted);text-align:right}
+
+/* Bottom Sheet */
+.sheet{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.42);opacity:0;transition:opacity .2s}
+.sheet-panel{position:relative;width:100%;max-width:720px;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:var(--card);border-radius:18px 18px 0 0;padding:10px 16px calc(18px + env(safe-area-inset-bottom));
+  transform:translateY(100%);transition:transform .22s ease-out}
+.sheet.open .sheet-bg{opacity:1}
+.sheet.open .sheet-panel{transform:none}
+.sheet-grip{width:38px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px}
+.sheet h2{margin:0 0 14px;font-size:19px}
+.sheet .btn.danger{margin-top:14px}
+
+/* Toast */
+.toast{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:60;
+  max-width:520px;margin:0 auto;background:#1c1c1e;color:#fff;border-radius:12px;padding:12px 14px;font-size:15px;
+  box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+.toast.bad{background:#a5281c}
+@media (prefers-color-scheme: dark){ .toast{background:#3a3a3c} }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <div class="brand">diyPOOL</div>
+      <h1 id="title">Inventar</h1>
+    </div>
+  </div>
+  <div class="banner" id="backupBanner" hidden>
+    <span>Ungesicherte Änderungen</span>
+    <button type="button" id="bannerBackup">Jetzt sichern</button>
+  </div>
+</header>
+
+<main>
+  <section id="tab-inventar" class="tab">
+    <div id="installHint"></div>
+    <div class="searchbar"><input id="invSearch" type="search" placeholder="Suchen nach Name oder Kennwerten" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+    <div id="invChips" class="chips"></div>
+    <div id="invList"></div>
+    <p id="invStats" class="stats"></p>
+  </section>
+
+  <section id="tab-erfassen" class="tab" hidden>
+    <div id="capView"></div>
+  </section>
+
+  <section id="tab-pruefen" class="tab" hidden>
+    <div id="chkView"></div>
+  </section>
+
+  <section id="tab-ideen" class="tab" hidden>
+    <div id="ideaView"></div>
+  </section>
+
+  <section id="tab-einstellungen" class="tab" hidden>
+    <div id="setView"></div>
+  </section>
+</main>
+
+<nav class="tabbar" aria-label="Navigation">
+  <div class="tabbar-inner">
+    <button type="button" data-tab="inventar" class="active">
+      <svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg>Inventar</button>
+    <button type="button" data-tab="erfassen">
+      <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.8"/></svg>Erfassen</button>
+    <button type="button" data-tab="pruefen">
+      <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="m8.5 13 2.5 2.5 4.5-5"/></svg>Prüfen</button>
+    <button type="button" data-tab="ideen">
+      <svg viewBox="0 0 24 24"><path d="M9.5 18h5M10.5 21h3"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.5 1.1-2.1A6 6 0 0 0 12 3z"/></svg>Ideen</button>
+    <button type="button" data-tab="einstellungen">
+      <svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Einstellungen</button>
+  </div>
+</nav>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-bg" id="sheetBg"></div>
+  <div class="sheet-panel" role="dialog" aria-modal="true"><div class="sheet-grip"></div><div id="sheetBody"></div></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<input type="file" id="camInput" class="vh" accept="image/*" capture="environment">
+<input type="file" id="libInput" class="vh" accept="image/*">
+<input type="file" id="importInput" class="vh">
+
+<script>
+'use strict';
+
+/* =========================================================
+   Grundeinstellungen
+   ========================================================= */
+const APP_VERSION = '1.0';
+const API_URL = 'https://api.anthropic.com/v1/messages';
+const API_VERSION = '2023-06-01';
+const DEFAULT_CATS = [
+  'Passive Bauteile', 'Halbleiter', 'Mikrocontroller und Module', 'Sensoren',
+  'Aktoren und Motoren', 'Stromversorgung und Akkus', 'Kabel und Steckverbinder',
+  'Mechanik und Befestigung', 'Werkzeug', 'Verbrauchsmaterial'
+];
+const MODELS = [
+  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (Standard)' },
+  { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 (schnell, günstig)' },
+  { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (genau, teurer)' },
+  { id: 'custom', label: 'Eigene Modell-ID' }
+];
+const K = { items: 'diypool.items', cats: 'diypool.categories', settings: 'diypool.settings', meta: 'diypool.meta' };
+const TAB_TITLES = { inventar: 'Inventar', erfassen: 'Erfassen', pruefen: 'Material prüfen', ideen: 'Projektideen', einstellungen: 'Einstellungen' };
+
+/* =========================================================
+   Hilfsfunktionen
+   ========================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+class AppError extends Error {}
+const uid = () => Date.now().toString(36).slice(-6) + Math.random().toString(36).slice(2, 6);
+const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+const fmtDate = ts => ts ? new Date(ts).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' }) : 'noch nie';
+const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; };
+const isStandalone = () => window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+const toInt = (v, min = 0) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(min, n) : min; };
+
+function load(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+}
+function store(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); return true; }
+  catch (e) { toast('Speichern fehlgeschlagen: Der Browser-Speicher ist nicht verfügbar oder voll.', true); return false; }
+}
+
+let toastTimer = null;
+function toast(msg, bad = false) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.toggle('bad', bad); t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), bad ? 4500 : 2800);
+}
+
+function sanitizeItem(o) {
+  o = o || {};
+  return {
+    id: String(o.id || uid()).slice(0, 40),
+    name: String(o.name || '').trim().slice(0, 200),
+    kategorie: String(o.kategorie || '').trim().slice(0, 80),
+    stueckzahl: toInt(o.stueckzahl),
+    kennwerte: String(o.kennwerte || '').trim().slice(0, 2000),
+    erstellt: Number(o.erstellt) || Date.now(),
+    geaendert: Number(o.geaendert) || Date.now()
+  };
+}
+
+/* =========================================================
+   Zustand
+   ========================================================= */
+const state = {
+  items: (load(K.items, []) || []).map(sanitizeItem).filter(i => i.name),
+  categories: (load(K.cats, null) || DEFAULT_CATS.slice()).map(String).filter(Boolean),
+  settings: Object.assign({ apiKey: '', model: 'claude-sonnet-5-5', customModel: '' }, load(K.settings, {})),
+  meta: Object.assign({ lastChange: 0, lastBackup: 0, hintDismissed: false }, load(K.meta, {}))
+};
+if (!state.categories.length) state.categories = DEFAULT_CATS.slice();
+
+const ui = { tab: 'inventar', filterCat: 'Alle', search: '' };
+
+const byId = id => id ? state.items.find(i => i.id === id) || null : null;
+const sortedItems = () => state.items.slice().sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' }));
+function allCats() {
+  const s = state.categories.slice();
+  state.items.forEach(i => { if (i.kategorie && !s.includes(i.kategorie)) s.push(i.kategorie); });
+  return s;
+}
+
+function saveData() {
+  const ok1 = store(K.items, state.items);
+  const ok2 = store(K.cats, state.categories);
+  state.meta.lastChange = Date.now();
+  store(K.meta, state.meta);
+  updateBanner();
+  return ok1 && ok2;
+}
+function saveSettings() { store(K.settings, state.settings); }
+function updateBanner() { $('#backupBanner').hidden = !(state.meta.lastChange > state.meta.lastBackup); }
+
+/* =========================================================
+   Navigation, Sheet
+   ========================================================= */
+function showTab(t) {
+  ui.tab = t;
+  document.querySelectorAll('.tab').forEach(s => { s.hidden = s.id !== 'tab-' + t; });
+  document.querySelectorAll('.tabbar button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  $('#title').textContent = TAB_TITLES[t];
+  window.scrollTo(0, 0);
+  if (t === 'inventar') renderInventory();
+  if (t === 'erfassen') renderCapture();
+  if (t === 'pruefen') renderCheck();
+  if (t === 'ideen') renderIdeas();
+  if (t === 'einstellungen') renderSettings();
+}
+
+function openSheet(html, onMount) {
+  const s = $('#sheet');
+  $('#sheetBody').innerHTML = html;
+  s.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('open')));
+  if (onMount) onMount($('#sheetBody'));
+}
+function closeSheet() {
+  const s = $('#sheet');
+  s.classList.remove('open');
+  setTimeout(() => { s.hidden = true; $('#sheetBody').innerHTML = ''; }, 230);
+}
+
+function qtyHtml(id, val) {
+  return `<div class="qtyfield">
+    <button type="button" class="qbtn" data-target="${id}" data-d="-1" aria-label="Weniger">&minus;</button>
+    <input id="${id}" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" value="${toInt(val)}">
+    <button type="button" class="qbtn" data-target="${id}" data-d="1" aria-label="Mehr">+</button></div>`;
+}
+function readQty(id) { const el = document.getElementById(id); return el ? toInt(el.value) : 0; }
+
+function categoryOptions(sel) {
+  const cats = state.categories.slice();
+  if (sel && !cats.includes(sel)) cats.push(sel);
+  return cats.map(c => `<option${c === sel ? ' selected' : ''}>${esc(c)}</option>`).join('');
+}
+
+/* =========================================================
+   Inventar
+   ========================================================= */
+function renderInventory() {
+  // Installationshinweis
+  $('#installHint').innerHTML = (!isStandalone() && !state.meta.hintDismissed) ? `
+    <div class="card">
+      <h3>Tipp: Als App installieren</h3>
+      <p class="small" style="margin:0">In Safari unten auf <b>Teilen</b> tippen und <b>Zum Home-Bildschirm</b> wählen. Danach diyPOOL nur noch über das Symbol öffnen. Die installierte App und Safari haben nach meinem Kenntnisstand getrennte Speicher, darum erst nach der Installation Daten erfassen.</p>
+      <button type="button" class="linkbtn" id="hintClose">Ausblenden</button>
+    </div>` : '';
+
+  const counts = {};
+  state.items.forEach(i => { counts[i.kategorie] = (counts[i.kategorie] || 0) + 1; });
+  const cats = allCats();
+  if (ui.filterCat !== 'Alle' && !counts[ui.filterCat]) ui.filterCat = 'Alle';
+
+  const chips = $('#invChips');
+  chips.hidden = state.items.length === 0;
+  chips.innerHTML = [`<button type="button" class="chip${ui.filterCat === 'Alle' ? ' on' : ''}" data-cat="Alle">Alle<span>${state.items.length}</span></button>`]
+    .concat(cats.filter(c => counts[c]).map(c => `<button type="button" class="chip${ui.filterCat === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c)}<span>${counts[c]}</span></button>`))
+    .join('');
+
+  renderInventoryList();
+}
+
+function renderInventoryList() {
+  const list = $('#invList');
+  const terms = norm(ui.search).split(' ').filter(Boolean);
+  const filtered = sortedItems().filter(it =>
+    (ui.filterCat === 'Alle' || it.kategorie === ui.filterCat) &&
+    terms.every(t => norm(it.name + ' ' + it.kennwerte + ' ' + it.kategorie).includes(t)));
+
+  if (!state.items.length) {
+    list.innerHTML = `<div class="card center">
+      <h3>Noch keine Bauteile erfasst</h3>
+      <p class="lead">Fotografiere ein Bauteil, die KI schlägt Name, Kategorie, Stückzahl und Kennwerte vor.</p>
+      <button type="button" class="btn primary block" data-go="erfassen">Erstes Bauteil erfassen</button>
+    </div>`;
+  } else if (!filtered.length) {
+    list.innerHTML = `<div class="card center muted">Keine Treffer.</div>`;
+  } else {
+    const groups = new Map();
+    filtered.forEach(it => {
+      const k = it.kategorie || 'Ohne Kategorie';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(it);
+    });
+    const order = allCats().concat(['Ohne Kategorie']);
+    list.innerHTML = order.filter(c => groups.has(c)).map(c => `
+      <h3 class="grouphead">${esc(c)}</h3>
+      <div class="card flush">${groups.get(c).map(rowHtml).join('')}</div>`).join('');
+  }
+  updateStats();
+}
+
+function rowHtml(it) {
+  return `<div class="row${it.stueckzahl === 0 ? ' zero' : ''}" data-id="${esc(it.id)}">
+    <button type="button" class="row-main" data-act="edit">
+      <span class="row-name">${esc(it.name)}</span>
+      ${it.kennwerte ? `<span class="row-sub">${esc(it.kennwerte.replace(/\s+/g, ' '))}</span>` : ''}
+    </button>
+    <div class="stepper">
+      <button type="button" data-act="dec" aria-label="Eins weniger"${it.stueckzahl === 0 ? ' disabled' : ''}>&minus;</button>
+      <span class="qty">${it.stueckzahl}</span>
+      <button type="button" data-act="inc" aria-label="Eins mehr">+</button>
+    </div>
+  </div>`;
+}
+
+function updateStats() {
+  const total = state.items.reduce((s, i) => s + i.stueckzahl, 0);
+  $('#invStats').textContent = state.items.length ? `${state.items.length} Einträge · ${total} Stück insgesamt` : '';
+}
+
+function openItemEditor(id, prefill) {
+  const it = byId(id);
+  const isNew = !it;
+  const v = it || Object.assign({ name: '', kategorie: state.categories[0], stueckzahl: 1, kennwerte: '' }, prefill || {});
+  openSheet(`
+    <h2>${isNew ? 'Bauteil manuell hinzufügen' : 'Eintrag bearbeiten'}</h2>
+    <label class="field"><span>Name</span><input id="edName" type="text" value="${esc(v.name)}" autocomplete="off" placeholder="z. B. Widerstand 220 Ω"></label>
+    <label class="field"><span>Kategorie</span><select id="edCat">${categoryOptions(v.kategorie)}</select></label>
+    <div class="field"><span>Stückzahl</span>${qtyHtml('edQty', v.stueckzahl)}</div>
+    <label class="field"><span>Technische Kennwerte</span><textarea id="edKenn" rows="3" placeholder="z. B. 0.25 W, 5 %, bedrahtet">${esc(v.kennwerte)}</textarea></label>
+    <div class="btnrow"><button type="button" class="btn" id="edCancel">Abbrechen</button><button type="button" class="btn primary" id="edSave">Speichern</button></div>
+    ${isNew ? '' : '<button type="button" class="btn danger block" id="edDelete">Eintrag löschen</button>'}
+  `, body => {
+    $('#edCancel', body).onclick = closeSheet;
+    $('#edSave', body).onclick = () => {
+      const name = $('#edName', body).value.trim();
+      if (!name) { alert('Bitte einen Namen eingeben.'); return; }
+      const data = { name, kategorie: $('#edCat', body).value, stueckzahl: readQty('edQty'), kennwerte: $('#edKenn', body).value.trim() };
+      if (isNew) {
+        const dup = state.items.find(i => norm(i.name) === norm(name));
+        if (dup && !confirm(`Es gibt bereits einen Eintrag «${dup.name}» (${dup.stueckzahl} Stk.). Trotzdem einen neuen Eintrag anlegen?`)) return;
+        state.items.push(sanitizeItem(Object.assign({ id: uid() }, data)));
+        toast(`Hinzugefügt: ${name}`);
+      } else {
+        Object.assign(it, data, { geaendert: Date.now() });
+        toast('Änderungen gespeichert.');
+      }
+      saveData(); closeSheet(); renderInventory();
+    };
+    if (!isNew) $('#edDelete', body).onclick = () => {
+      if (!confirm(`«${it.name}» wirklich löschen?`)) return;
+      state.items = state.items.filter(i => i.id !== it.id);
+      saveData(); closeSheet(); renderInventory(); toast('Eintrag gelöscht.');
+    };
+  });
+}
+
+/* =========================================================
+   KI-Anbindung
+   ========================================================= */
+function currentModel() {
+  const s = state.settings;
+  return s.model === 'custom' ? (s.customModel || '').trim() || 'claude-sonnet-5-5' : s.model;
+}
+
+function apiErrorMessage(status, data) {
+  const raw = data && data.error && data.error.message ? String(data.error.message) : '';
+  const lower = raw.toLowerCase();
+  let msg;
+  if (status === 401) msg = 'Der API-Schlüssel ist ungültig. Bitte in den Einstellungen prüfen.';
+  else if (status === 403) msg = 'Zugriff verweigert. Bitte die Berechtigungen des API-Schlüssels prüfen.';
+  else if (status === 404) msg = 'Das gewählte Modell wurde nicht gefunden. Bitte das Modell in den Einstellungen prüfen.';
+  else if (status === 400 && lower.includes('credit')) msg = 'Das Guthaben im Anthropic-Konto ist aufgebraucht.';
+  else if (status === 413) msg = 'Die Anfrage ist zu gross (z. B. Bild oder Inventar).';
+  else if (status === 429) msg = 'Zu viele Anfragen oder Limit erreicht. Bitte kurz warten und erneut versuchen.';
+  else if (status === 529 || status >= 500) msg = 'Der KI-Dienst ist gerade überlastet oder gestört. Bitte später erneut versuchen.';
+  else msg = `Die KI-Anfrage ist fehlgeschlagen (Status ${status}).`;
+  return raw ? `${msg} (Meldung: ${raw})` : msg;
+}
+
+function extractJson(text) {
+  const a = text.indexOf('{'), b = text.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try { return JSON.parse(text.slice(a, b + 1)); } catch (e) { return null; }
+}
+
+async function callClaude({ system, content, tool, maxTokens = 1024, timeoutMs = 120000 }) {
+  const key = (state.settings.apiKey || '').trim();
+  if (!key) throw new AppError('Es ist kein API-Schlüssel hinterlegt. Bitte zuerst in den Einstellungen eintragen.');
+  if (navigator.onLine === false) throw new AppError('Keine Internetverbindung. Die KI-Funktionen brauchen Internet.');
+
+  const body = { model: currentModel(), max_tokens: maxTokens, messages: [{ role: 'user', content }] };
+  if (system) body.system = system;
+  if (tool) { body.tools = [tool]; body.tool_choice = { type: 'tool', name: tool.name }; }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': API_VERSION,
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify(body),
+      signal: ctrl.signal
+    });
+  } catch (e) {
+    throw new AppError(e.name === 'AbortError'
+      ? 'Die KI hat zu lange nicht geantwortet. Bitte erneut versuchen.'
+      : 'Die Verbindung zur KI ist fehlgeschlagen. Bitte Internetverbindung prüfen.');
+  } finally { clearTimeout(timer); }
+
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* keine JSON-Antwort */ }
+  if (!res.ok) throw new AppError(apiErrorMessage(res.status, data));
+  if (!data || !Array.isArray(data.content)) throw new AppError('Die Antwort der KI war unvollständig.');
+  if (data.stop_reason === 'max_tokens') throw new AppError('Die Antwort der KI wurde abgeschnitten, weil sie zu lang war. Bitte die Anfrage kürzen.');
+
+  if (!tool) return data;
+  const block = data.content.find(b => b.type === 'tool_use' && b.name === tool.name);
+  if (block && block.input) return block.input;
+  const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+  const parsed = extractJson(text);
+  if (parsed) return parsed;
+  throw new AppError('Die Antwort der KI konnte nicht ausgewertet werden. Bitte erneut versuchen.');
+}
+
+function inventoryContext() {
+  if (!state.items.length) return '(Inventar ist leer)';
+  return sortedItems().map(i =>
+    `[${i.id}] ${i.name} | ${i.kategorie} | ${i.stueckzahl} Stk.${i.kennwerte ? ' | ' + i.kennwerte.replace(/\s+/g, ' ') : ''}`).join('\n');
+}
+
+/* =========================================================
+   Erfassen
+   ========================================================= */
+const cap = { phase: 'idle', img: null, b64: null, result: null, error: null, local: null };
+
+function resetCapture() { Object.assign(cap, { phase: 'idle', img: null, b64: null, result: null, error: null, local: null }); renderCapture(); }
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { resolve(img); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new AppError('Das Bild konnte nicht gelesen werden.')); };
+    img.src = url;
+  });
+}
+
+async function prepareImage(file) {
+  const img = await loadImage(file);
+  const MAX = 1568;
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (!w || !h) throw new AppError('Das Bild ist leer oder beschädigt.');
+  const scale = Math.min(1, MAX / Math.max(w, h));
+  const cw = Math.round(w * scale), ch = Math.round(h * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = cw; canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch);
+  ctx.drawImage(img, 0, 0, cw, ch);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  return { dataUrl, b64: dataUrl.split(',')[1] };
+}
+
+const REC_SYSTEM = `Du hilfst beim Inventarisieren eines privaten Lagers mit Elektronikbauteilen, Hardware, Mechanikteilen, Werkzeug und Verbrauchsmaterial.
+Das Foto zeigt genau einen Bauteiltyp, eventuell in mehreren Exemplaren.
+
+Vorgehen:
+1. Bestimme das Bauteil und gib eine kurze, eindeutige deutsche Bezeichnung an, wie man sie in einem Inventar verwendet, z. B. «Widerstand 220 Ω», «ESP32-DevKitC V4», «Kreuzschlitz-Schraubendreher PH1», «Zylinderkopfschraube M3×10». Verwende die Schweizer Schreibweise (ss statt ß).
+2. Wähle die passendste Kategorie aus der vorgegebenen Liste.
+3. Zähle die sichtbaren Exemplare dieses Bauteiltyps. Wenn Teile verdeckt, gestapelt oder verpackt sind, schätze und setze zaehlung auf «geschaetzt» oder bei grosser Unsicherheit auf «unsicher». Steht auf einer Verpackung eine Menge, darfst du diese verwenden und das im Hinweis erwähnen.
+4. Notiere technische Kennwerte, die auf dem Foto tatsächlich erkennbar sind (Aufdruck, Bauform, Gewinde, Länge, Farbringe). Erfinde nichts. Was nicht erkennbar ist, lässt du weg. Ist ein Wert nur vermutet, schreibe «vermutlich» davor. Farben von Widerstandsringen sind auf Fotos oft verfälscht: Gib einen Widerstandswert nur an, wenn die Ringe klar lesbar sind, sonst weise darauf hin.
+5. Prüfe, ob das Bauteil bereits im Inventar steht. Setze match_id nur, wenn es eindeutig derselbe Bauteiltyp mit denselben Kennwerten ist, sonst einen leeren String. Erfinde keine IDs.
+6. Schreibe in hinweis kurz, was unsicher ist oder was die Person prüfen sollte. Leer lassen, wenn nichts zu beachten ist.
+Ist auf dem Foto kein Bauteil, Material oder Werkzeug erkennbar, setze erkannt auf false und erkläre im Hinweis kurz, warum.`;
+
+function recognitionTool() {
+  return {
+    name: 'bauteil_erfassen',
+    description: 'Gibt das auf dem Foto erkannte Bauteil zurück.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        erkannt: { type: 'boolean', description: 'false, wenn kein Bauteil, Material oder Werkzeug erkennbar ist' },
+        name: { type: 'string', description: 'Kurze deutsche Inventarbezeichnung' },
+        kategorie: { type: 'string', enum: state.categories.slice() },
+        stueckzahl: { type: 'integer', minimum: 0 },
+        zaehlung: { type: 'string', enum: ['gezaehlt', 'geschaetzt', 'unsicher'] },
+        kennwerte: { type: 'string', description: 'Erkennbare technische Kennwerte, sonst leer' },
+        match_id: { type: 'string', description: 'ID eines identischen bestehenden Inventareintrags, sonst leerer String' },
+        hinweis: { type: 'string', description: 'Kurzer Hinweis zu Unsicherheiten, sonst leer' }
+      },
+      required: ['erkannt', 'name', 'kategorie', 'stueckzahl', 'zaehlung', 'kennwerte', 'match_id', 'hinweis']
+    }
+  };
+}
+
+async function handlePhoto(file) {
+  if (!file) return;
+  cap.phase = 'loading'; cap.error = null; cap.result = null; cap.img = null;
+  renderCapture();
+  try {
+    const { dataUrl, b64 } = await prepareImage(file);
+    cap.img = dataUrl; cap.b64 = b64;
+    renderCapture();
+    await runRecognition();
+  } catch (e) {
+    cap.phase = 'error'; cap.error = e instanceof AppError ? e.message : 'Unerwarteter Fehler: ' + e.message;
+    renderCapture();
+  }
+}
+
+async function runRecognition() {
+  cap.phase = 'loading'; cap.error = null;
+  renderCapture();
+  try {
+    const r = await callClaude({
+      system: REC_SYSTEM,
+      tool: recognitionTool(),
+      maxTokens: 1024,
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: cap.b64 } },
+        { type: 'text', text: `Kategorien: ${state.categories.join('; ')}\n\nAktuelles Inventar (ID | Name | Kategorie | Stückzahl | Kennwerte):\n${inventoryContext()}` }
+      ]
+    });
+    const res = {
+      erkannt: r.erkannt !== false,
+      name: String(r.name || '').trim(),
+      kategorie: String(r.kategorie || '').trim(),
+      stueckzahl: toInt(r.stueckzahl),
+      zaehlung: ['gezaehlt', 'geschaetzt', 'unsicher'].includes(r.zaehlung) ? r.zaehlung : 'unsicher',
+      kennwerte: String(r.kennwerte || '').trim(),
+      match_id: byId(String(r.match_id || '')) ? String(r.match_id) : '',
+      hinweis: String(r.hinweis || '').trim()
+    };
+    // Rückfall: lokaler Abgleich über identischen Namen
+    if (!res.match_id && res.name) {
+      const same = state.items.find(i => norm(i.name) === norm(res.name) && norm(i.kennwerte) === norm(res.kennwerte));
+      if (same) res.match_id = same.id;
+    }
+    cap.result = res; cap.phase = 'preview';
+  } catch (e) {
+    cap.phase = 'error'; cap.error = e instanceof AppError ? e.message : 'Unerwarteter Fehler: ' + e.message;
+  }
+  renderCapture();
+}
+
+const ICON_CAM = '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.8"/></svg>';
+
+function renderCapture() {
+  const v = $('#capView');
+  const noKey = !(state.settings.apiKey || '').trim();
+
+  if (cap.phase === 'idle') {
+    v.innerHTML = `
+      ${noKey ? `<div class="card"><h3>API-Schlüssel fehlt</h3><p class="small" style="margin:0 0 10px">Für die Erkennung per Foto braucht diyPOOL deinen Anthropic-API-Schlüssel.</p><button type="button" class="btn block" data-go="einstellungen">Zu den Einstellungen</button></div>` : ''}
+      <div class="card center">
+        <p class="lead">Ein Bauteiltyp pro Foto. Teile möglichst nebeneinander auf einen ruhigen, hellen Hintergrund legen, damit sie gezählt werden können.</p>
+        <label class="btn primary big" for="camInput">${ICON_CAM}Foto aufnehmen</label>
+        <div style="height:10px"></div>
+        <label class="btn block" for="libInput">Aus Fotos wählen</label>
+      </div>
+      <div class="center"><button type="button" class="linkbtn" data-act="manual">Ohne Foto manuell hinzufügen</button></div>`;
+    return;
+  }
+
+  if (cap.phase === 'loading') {
+    v.innerHTML = `<div class="card center">
+      ${cap.img ? `<img class="thumb" src="${cap.img}" alt="Aufgenommenes Foto">` : ''}
+      <div class="spinner"></div>
+      <p class="muted" style="margin:0">${cap.img ? 'Bauteil wird erkannt …' : 'Foto wird vorbereitet …'}</p>
+    </div>`;
+    return;
+  }
+
+  if (cap.phase === 'error') {
+    v.innerHTML = `<div class="card">
+      ${cap.img ? `<img class="thumb" src="${cap.img}" alt="Aufgenommenes Foto">` : ''}
+      <h3>Erkennung nicht möglich</h3>
+      <p class="note bad" style="margin-top:0">${esc(cap.error)}</p>
+      <div class="stack" style="margin-top:14px">
+        ${cap.b64 ? '<button type="button" class="btn primary block" data-act="retry">Erneut versuchen</button>' : ''}
+        <label class="btn block" for="camInput">Neues Foto</label>
+        <button type="button" class="btn block" data-act="discard">Abbrechen</button>
+      </div>
+    </div>
+    <div class="center"><button type="button" class="linkbtn" data-act="manual">Stattdessen manuell hinzufügen</button></div>`;
+    return;
+  }
+
+  // Vorschau
+  const r = cap.result;
+  const z = { gezaehlt: ['ok', 'gezählt'], geschaetzt: ['warn', 'geschätzt, bitte prüfen'], unsicher: ['bad', 'unsicher, bitte nachzählen'] }[r.zaehlung];
+  const match = byId(r.match_id);
+  const hasItems = state.items.length > 0;
+  const mode = match ? 'add' : 'new';
+  const targetOpts = sortedItems().map(i => {
+    const kw = i.kennwerte ? ' – ' + (i.kennwerte.length > 30 ? i.kennwerte.slice(0, 30) + '…' : i.kennwerte) : '';
+    return `<option value="${esc(i.id)}"${match && i.id === match.id ? ' selected' : ''}>${esc(i.name + kw)} (${i.stueckzahl} Stk.)</option>`;
+  }).join('');
+
+  v.innerHTML = `
+    <div class="card">
+      <img class="thumb" src="${cap.img}" alt="Aufgenommenes Foto">
+      ${!r.erkannt ? '<p class="note bad" style="margin:0 0 12px">Auf dem Foto wurde kein Bauteil erkannt. Du kannst die Felder selbst ausfüllen oder ein neues Foto machen.</p>' : ''}
+      ${r.hinweis ? `<p class="note warn" style="margin:0 0 12px">${esc(r.hinweis)}</p>` : ''}
+      <div id="capFields">
+        <label class="field"><span>Name</span><input id="capName" type="text" value="${esc(r.name)}" autocomplete="off"></label>
+        <label class="field"><span>Kategorie</span><select id="capCat">${categoryOptions(r.kategorie || state.categories[0])}</select></label>
+      </div>
+      <div class="field"><span>Stückzahl ${r.erkannt ? `<span class="badge ${z[0]}">${z[1]}</span>` : ''}</span>${qtyHtml('capQty', r.stueckzahl)}</div>
+      <label class="field" id="capKennWrap"><span>Technische Kennwerte</span><textarea id="capKenn" rows="3">${esc(r.kennwerte)}</textarea></label>
+      <button type="button" class="btn small" data-act="retry">Erneut erkennen</button>
+    </div>
+    ${hasItems ? `
+    <div class="card">
+      <h3>Speichern als</h3>
+      ${match ? '<p class="small muted" style="margin:-4px 0 6px">Die KI hat einen passenden Eintrag gefunden.</p>' : ''}
+      <label class="radio"><input type="radio" name="capMode" value="add"${mode === 'add' ? ' checked' : ''}>Zu bestehendem Eintrag addieren</label>
+      <div class="indent">
+        <select id="capTarget">${match ? '' : '<option value="">Eintrag wählen …</option>'}${targetOpts}</select>
+        <p class="small muted" id="capTargetInfo" style="margin:6px 2px 0"></p>
+      </div>
+      <label class="radio"><input type="radio" name="capMode" value="new"${mode === 'new' ? ' checked' : ''}>Als neuen Eintrag anlegen</label>
+    </div>` : ''}
+    <div class="btnrow"><button type="button" class="btn" data-act="discard">Verwerfen</button><button type="button" class="btn primary" data-act="save">Speichern</button></div>`;
+  updateCaptureInfo();
+}
+
+function captureMode() {
+  const r = document.querySelector('input[name=capMode]:checked');
+  return r ? r.value : 'new';
+}
+
+function updateCaptureInfo() {
+  if (cap.phase !== 'preview') return;
+  const mode = captureMode();
+  const add = mode === 'add';
+  ['capFields', 'capKennWrap'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle('dim', add); });
+  const info = $('#capTargetInfo');
+  const sel = $('#capTarget');
+  if (sel) sel.disabled = !add;
+  if (!info) return;
+  const t = sel ? byId(sel.value) : null;
+  const q = readQty('capQty');
+  info.textContent = add
+    ? (t ? `Bestand: ${t.stueckzahl} → ${t.stueckzahl + q} Stk. Name und Kennwerte des Eintrags bleiben unverändert.` : 'Bitte einen Eintrag wählen.')
+    : '';
+}
+
+function saveCapture() {
+  const mode = captureMode();
+  const qty = readQty('capQty');
+  if (mode === 'add') {
+    const t = byId($('#capTarget') && $('#capTarget').value);
+    if (!t) { alert('Bitte einen bestehenden Eintrag wählen oder «Als neuen Eintrag anlegen» auswählen.'); return; }
+    if (qty <= 0) { alert('Die Stückzahl muss grösser als 0 sein.'); return; }
+    t.stueckzahl += qty; t.geaendert = Date.now();
+    saveData();
+    toast(`${t.name}: +${qty} (jetzt ${t.stueckzahl} Stk.)`);
+  } else {
+    const name = $('#capName').value.trim();
+    if (!name) { alert('Bitte einen Namen eingeben.'); return; }
+    const it = sanitizeItem({ id: uid(), name, kategorie: $('#capCat').value, stueckzahl: qty, kennwerte: $('#capKenn').value.trim() });
+    state.items.push(it);
+    saveData();
+    toast(`Gespeichert: ${it.name} (${qty} Stk.)`);
+  }
+  resetCapture();
+}
+
+/* =========================================================
+   Material prüfen
+   ========================================================= */
+const chk = { mode: 'liste', text: '', phase: 'idle', result: null, error: null, usedMode: 'liste' };
+
+function checkTool() {
+  return {
+    name: 'materialpruefung',
+    description: 'Gibt die Stückliste mit Zuordnung zum Inventar zurück.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        projekt: { type: 'string', description: 'Kurzer Projekttitel' },
+        positionen: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Benötigtes Bauteil oder Material' },
+              menge: { type: 'integer', minimum: 1 },
+              inventar_id: { type: 'string', description: 'ID des passenden Inventareintrags, sonst leerer String' },
+              alternative_id: { type: 'string', description: 'ID eines gleichwertigen Ersatzes im Inventar, sonst leerer String' },
+              alternative_begruendung: { type: 'string', description: 'Warum der Ersatz funktioniert, sonst leer' },
+              hinweis: { type: 'string', description: 'Optionaler kurzer Hinweis, sonst leer' }
+            },
+            required: ['name', 'menge', 'inventar_id', 'alternative_id', 'alternative_begruendung', 'hinweis']
+          }
+        },
+        hinweis: { type: 'string', description: 'Optionaler Gesamthinweis, sonst leer' }
+      },
+      required: ['projekt', 'positionen', 'hinweis']
+    }
+  };
+}
+
+function checkSystem(mode) {
+  return `Du prüfst, ob für ein Bastel- oder Elektronikprojekt genügend Material in einem privaten Inventar vorhanden ist.
+Du erhältst das Inventar mit IDs und ${mode === 'liste' ? 'eine Stückliste' : 'eine Projektbeschreibung'}.
+${mode === 'beschreibung'
+    ? 'Erstelle zuerst eine realistische, möglichst knappe Stückliste für das beschriebene Projekt mit üblichen Hobby-Bauteilen. Führe nur Bauteile und Material auf, kein Standardwerkzeug wie Lötkolben oder Schraubendreher, ausser es ist für dieses Projekt ausdrücklich nötig. Gib im Feld projekt einen kurzen Titel an.'
+    : 'Übernimm die Positionen der Stückliste vollständig und in der gegebenen Reihenfolge. Fehlt eine Mengenangabe, nimm 1 an. Gib im Feld projekt einen kurzen Titel an, abgeleitet aus der Liste, sonst «Stückliste».'}
+Für jede Position:
+- inventar_id: ID des Inventareintrags, der genau diesem Bauteil entspricht, sonst leerer String. Ordne nur zu, wenn Typ und relevante Kennwerte übereinstimmen.
+- alternative_id: Nur wenn kein passender oder kein ausreichender Eintrag vorhanden ist, aber ein anderer Inventareintrag technisch gleichwertig einsetzbar ist (z. B. 270 Ω statt 220 Ω als LED-Vorwiderstand). Sonst leerer String. Begründe in alternative_begruendung kurz, warum der Ersatz funktioniert und worauf zu achten ist.
+- hinweis: optional und kurz.
+Erfinde keine Inventareinträge und keine IDs. Die verfügbaren Mengen rechnet die App selbst nach, du musst nur korrekt zuordnen. Schweizer Schreibweise (ss statt ß).`;
+}
+
+async function runCheck() {
+  const text = chk.text.trim();
+  if (!text) { alert(chk.mode === 'liste' ? 'Bitte zuerst eine Stückliste einfügen.' : 'Bitte zuerst das Projekt beschreiben.'); return; }
+  if (!state.items.length) { alert('Das Inventar ist noch leer. Erfasse zuerst einige Bauteile.'); return; }
+  chk.phase = 'loading'; chk.error = null; chk.usedMode = chk.mode;
+  renderCheck();
+  try {
+    const r = await callClaude({
+      system: checkSystem(chk.mode),
+      tool: checkTool(),
+      maxTokens: 8000,
+      content: [{ type: 'text', text: `${chk.mode === 'liste' ? 'Stückliste' : 'Projektbeschreibung'}:\n${text}\n\nInventar (ID | Name | Kategorie | Stückzahl | Kennwerte):\n${inventoryContext()}` }]
+    });
+    if (!Array.isArray(r.positionen)) throw new AppError('Die Antwort der KI enthielt keine Positionen.');
+    chk.result = r; chk.phase = 'result';
+  } catch (e) {
+    chk.phase = 'error'; chk.error = e instanceof AppError ? e.message : 'Unerwarteter Fehler: ' + e.message;
+  }
+  renderCheck();
+}
+
+function evalPosition(p) {
+  const need = Math.max(1, toInt(p.menge, 1));
+  const it = byId(String(p.inventar_id || ''));
+  const have = it ? it.stueckzahl : 0;
+  const status = it && have >= need ? 'ok' : it && have > 0 ? 'warn' : 'bad';
+  let alt = byId(String(p.alternative_id || ''));
+  if (alt && it && alt.id === it.id) alt = null;
+  const altEnough = alt ? alt.stueckzahl >= need : false;
+  return { need, it, have, status, alt, altEnough };
+}
+
+function renderCheck() {
+  const v = $('#chkView');
+  const ph = chk.mode === 'liste'
+    ? 'Materialliste hier einfügen, z. B.\n1x ESP32-DevKit\n2x Widerstand 10 kΩ\n1x DHT22 Sensor\n10x Jumper-Kabel'
+    : 'Projekt beschreiben, z. B. «Wetterstation mit ESP32, die Temperatur und Luftfeuchtigkeit auf einem kleinen Display anzeigt»';
+  const busy = chk.phase === 'loading';
+
+  let html = `<div class="card">
+    <div class="seg" role="tablist">
+      <button type="button" data-mode="liste" class="${chk.mode === 'liste' ? 'on' : ''}">Stückliste einfügen</button>
+      <button type="button" data-mode="beschreibung" class="${chk.mode === 'beschreibung' ? 'on' : ''}">Projekt beschreiben</button>
+    </div>
+    <textarea id="chkText" rows="7" placeholder="${esc(ph)}">${esc(chk.text)}</textarea>
+    <button type="button" class="btn primary block" id="chkRun" style="margin-top:12px"${busy ? ' disabled' : ''}>Material prüfen</button>
+  </div>`;
+
+  if (busy) html += `<div class="card center"><div class="spinner"></div><p class="muted" style="margin:0">${chk.mode === 'beschreibung' ? 'Stückliste wird erstellt und geprüft …' : 'Stückliste wird geprüft …'}</p></div>`;
+  if (chk.phase === 'error') html += `<div class="card"><p class="note bad" style="margin:0">${esc(chk.error)}</p></div>`;
+
+  if (chk.phase === 'result' && chk.result) {
+    const pos = chk.result.positionen.map(p => Object.assign({ p }, evalPosition(p)));
+    const n = { ok: 0, warn: 0, bad: 0 };
+    pos.forEach(x => n[x.status]++);
+    const altCount = pos.filter(x => x.status !== 'ok' && x.alt && x.altEnough).length;
+    html += `<div class="card">
+      <h3>${esc(chk.result.projekt || 'Ergebnis')}</h3>
+      <div class="pills">
+        <span class="pill ok">${n.ok} vorhanden</span>
+        ${n.warn ? `<span class="pill warn">${n.warn} teilweise</span>` : ''}
+        ${n.bad ? `<span class="pill bad">${n.bad} ${n.bad === 1 ? 'fehlt' : 'fehlen'}</span>` : ''}
+        ${altCount ? `<span class="pill neutral">${altCount} mit Alternative</span>` : ''}
+      </div>
+      ${chk.usedMode === 'beschreibung' ? '<p class="note">Die Stückliste wurde von der KI vorgeschlagen. Bitte auf Vollständigkeit prüfen.</p>' : ''}
+      ${chk.result.hinweis ? `<p class="note warn">${esc(chk.result.hinweis)}</p>` : ''}
+    </div>
+    <div class="card flush">${pos.map(x => {
+      const label = x.status === 'ok' ? 'vorhanden' : x.status === 'warn' ? `teilweise (${x.have} von ${x.need})` : 'fehlt';
+      return `<div class="pos">
+        <span class="dot ${x.status}"></span>
+        <div class="pos-body">
+          <div class="pos-head"><span class="pos-name">${x.need} × ${esc(x.p.name)}</span><span class="pos-status ${x.status}">${label}</span></div>
+          ${x.it ? `<div class="pos-sub">Inventar: ${esc(x.it.name)}${x.it.kennwerte ? ' – ' + esc(x.it.kennwerte) : ''} · ${x.it.stueckzahl} Stk.</div>` : ''}
+          ${x.status !== 'ok' && x.alt ? `<div class="pos-alt"><b>Alternative:</b> ${esc(x.alt.name)} · ${x.alt.stueckzahl} Stk.${x.altEnough ? '' : ' (reicht nicht ganz)'}${x.p.alternative_begruendung ? '<br>' + esc(x.p.alternative_begruendung) : ''}</div>` : ''}
+          ${x.p.hinweis ? `<div class="pos-sub">${esc(x.p.hinweis)}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('')}</div>
+    <button type="button" class="btn block" id="chkReset">Neue Prüfung</button>`;
+  }
+  v.innerHTML = html;
+}
+
+/* =========================================================
+   Projektideen
+   ========================================================= */
+const idea = { strict: false, wish: '', phase: 'idle', list: [], error: null, usedStrict: false };
+
+function ideaTool() {
+  return {
+    name: 'projektideen',
+    description: 'Gibt Projektvorschläge mit Teileliste zurück.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        vorschlaege: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              titel: { type: 'string' },
+              beschreibung: { type: 'string', description: '2 bis 3 Sätze, was das Projekt macht und wie es grob funktioniert' },
+              schwierigkeit: { type: 'string', enum: ['einfach', 'mittel', 'anspruchsvoll'] },
+              teile: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    menge: { type: 'integer', minimum: 1 },
+                    inventar_id: { type: 'string', description: 'ID aus dem Inventar, leer wenn das Teil fehlt' }
+                  },
+                  required: ['name', 'menge', 'inventar_id']
+                }
+              }
+            },
+            required: ['titel', 'beschreibung', 'schwierigkeit', 'teile']
+          }
+        }
+      },
+      required: ['vorschlaege']
+    }
+  };
+}
+
+function ideaSystem(strict) {
+  return `Du schlägst Bastel- und Elektronikprojekte vor, die mit einem privaten Inventar umsetzbar sind.
+${strict
+    ? 'Verwende ausschliesslich Teile aus dem Inventar und nicht mehr Stück, als vorhanden sind. Jedes Teil braucht eine gültige inventar_id.'
+    : 'Verwende so weit wie möglich Teile aus dem Inventar. Pro Vorschlag dürfen höchstens 3 Teile fehlen. Fehlende Teile bekommen eine leere inventar_id.'}
+Gängiges Standardwerkzeug (Lötkolben, Seitenschneider, Schraubendreher, Computer zum Programmieren) musst du nicht aufführen.
+Liefere 4 abwechslungsreiche, realistisch umsetzbare Vorschläge. Keine Bauanleitung.
+Erfinde keine IDs. Schweizer Schreibweise (ss statt ß).`;
+}
+
+async function runIdeas(more) {
+  if (!state.items.length) { alert('Das Inventar ist noch leer. Erfasse zuerst einige Bauteile.'); return; }
+  const wish = idea.wish.trim();
+  if (!more) { idea.list = []; }
+  idea.phase = 'loading'; idea.error = null; idea.usedStrict = idea.strict;
+  renderIdeas();
+  try {
+    const avoid = idea.list.map(x => x.titel).filter(Boolean);
+    const r = await callClaude({
+      system: ideaSystem(idea.strict),
+      tool: ideaTool(),
+      maxTokens: 6000,
+      content: [{ type: 'text', text:
+        `${wish ? 'Wünsche: ' + wish + '\n\n' : ''}${avoid.length ? 'Diese Vorschläge wurden bereits gemacht, bitte andere Ideen: ' + avoid.join('; ') + '\n\n' : ''}Inventar (ID | Name | Kategorie | Stückzahl | Kennwerte):\n${inventoryContext()}` }]
+    });
+    if (!Array.isArray(r.vorschlaege)) throw new AppError('Die Antwort der KI enthielt keine Vorschläge.');
+    idea.list = idea.list.concat(r.vorschlaege.map(x => Object.assign({ strict: idea.strict }, x)));
+    idea.phase = 'result';
+  } catch (e) {
+    idea.phase = idea.list.length ? 'result' : 'error';
+    idea.error = e instanceof AppError ? e.message : 'Unerwarteter Fehler: ' + e.message;
+  }
+  renderIdeas();
+}
+
+function renderIdeas() {
+  const v = $('#ideaView');
+  const busy = idea.phase === 'loading';
+  let html = `<div class="card">
+    <div class="seg" role="tablist">
+      <button type="button" data-strict="0" class="${!idea.strict ? 'on' : ''}">Wenige fehlende Teile</button>
+      <button type="button" data-strict="1" class="${idea.strict ? 'on' : ''}">Nur vorhandenes</button>
+    </div>
+    <label class="field" style="margin-bottom:0"><span>Wünsche (optional)</span>
+      <input id="ideaWish" type="text" value="${esc(idea.wish)}" placeholder="z. B. Sensorprojekt, für den Unterricht, an einem Nachmittag" autocomplete="off"></label>
+    <button type="button" class="btn primary block" id="ideaRun" style="margin-top:12px"${busy ? ' disabled' : ''}>Ideen generieren</button>
+  </div>`;
+
+  idea.list.forEach(x => {
+    const parts = (Array.isArray(x.teile) ? x.teile : []).map(t => {
+      const need = Math.max(1, toInt(t.menge, 1));
+      const it = byId(String(t.inventar_id || ''));
+      const st = it && it.stueckzahl >= need ? 'ok' : it && it.stueckzahl > 0 ? 'warn' : 'bad';
+      return { t, need, it, st };
+    });
+    const missing = parts.filter(p => p.st !== 'ok').length;
+    const diff = { einfach: 'einfach', mittel: 'mittel', anspruchsvoll: 'anspruchsvoll' }[x.schwierigkeit] || '';
+    html += `<div class="card idea">
+      <h3>${esc(x.titel)}</h3>
+      <div class="idea-meta">
+        ${diff ? `<span class="pill neutral">${diff}</span>` : ''}
+        ${missing ? `<span class="pill ${missing === parts.length ? 'bad' : 'warn'}">${missing} ${missing === 1 ? 'Teil fehlt' : 'Teile fehlen'}</span>` : '<span class="pill ok">Alles vorhanden</span>'}
+      </div>
+      <p>${esc(x.beschreibung)}</p>
+      ${x.strict && missing ? '<p class="note warn" style="margin:0 0 10px">Obwohl nur vorhandenes Material verlangt war, reicht der Bestand laut Inventar nicht für alle Teile.</p>' : ''}
+      <ul class="parts">${parts.map(p => `<li>
+        <span class="dot ${p.st}"></span>
+        <span class="pn">${p.need} × ${esc(p.it ? p.it.name : p.t.name)}</span>
+        <span class="ps">${p.it ? p.it.stueckzahl + ' Stk. da' : 'fehlt'}</span></li>`).join('')}</ul>
+    </div>`;
+  });
+
+  if (busy) html += `<div class="card center"><div class="spinner"></div><p class="muted" style="margin:0">Ideen werden gesucht …</p></div>`;
+  if (idea.error && !busy) html += `<div class="card"><p class="note bad" style="margin:0">${esc(idea.error)}</p></div>`;
+  if (idea.list.length && !busy) html += `<button type="button" class="btn block" id="ideaMore">Weitere Ideen</button>`;
+  v.innerHTML = html;
+}
+
+/* =========================================================
+   Backup, Import, CSV
+   ========================================================= */
+async function shareOrDownload(blob, filename) {
+  let file = null;
+  try { file = new File([blob], filename, { type: blob.type }); } catch (e) { file = null; }
+  if (file && navigator.canShare && navigator.share) {
+    let can = false;
+    try { can = navigator.canShare({ files: [file] }); } catch (e) { can = false; }
+    if (can) {
+      try { await navigator.share({ files: [file], title: filename }); return true; }
+      catch (e) { if (e.name === 'AbortError') return false; /* sonst Download versuchen */ }
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 15000);
+  return true;
+}
+
+async function exportBackup() {
+  const data = { app: 'diyPOOL', format: 1, version: APP_VERSION, exportiert: new Date().toISOString(), kategorien: state.categories, inventar: state.items };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const ok = await shareOrDownload(blob, `diyPOOL-Backup-${stamp()}.json`);
+  if (ok) {
+    state.meta.lastBackup = Date.now();
+    store(K.meta, state.meta);
+    updateBanner();
+    toast('Backup erstellt.');
+    if (ui.tab === 'einstellungen') renderSettings();
+  }
+}
+
+async function importBackup(file) {
+  let data;
+  try { data = JSON.parse(await file.text()); }
+  catch (e) { alert('Die Datei ist kein gültiges diyPOOL-Backup.'); return; }
+  if (!data || data.app !== 'diyPOOL' || !Array.isArray(data.inventar)) { alert('Die Datei ist kein gültiges diyPOOL-Backup.'); return; }
+  const items = data.inventar.map(sanitizeItem).filter(i => i.name);
+  const cats = Array.isArray(data.kategorien) && data.kategorien.length ? data.kategorien.map(String).filter(Boolean) : DEFAULT_CATS.slice();
+  const when = data.exportiert ? fmtDate(Date.parse(data.exportiert)) : 'unbekannt';
+  if (!confirm(`Backup vom ${when} mit ${items.length} Einträgen laden?\n\nDas aktuelle Inventar (${state.items.length} Einträge) wird dabei ersetzt.`)) return;
+  // IDs eindeutig halten
+  const seen = new Set();
+  items.forEach(i => { while (seen.has(i.id)) i.id = uid(); seen.add(i.id); });
+  state.items = items; state.categories = cats;
+  saveData();
+  state.meta.lastBackup = state.meta.lastChange;
+  store(K.meta, state.meta);
+  updateBanner();
+  renderSettings(); renderInventory();
+  toast(`Backup geladen: ${items.length} Einträge.`);
+}
+
+function exportCsv() {
+  const q = s => { s = String(s ?? ''); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const order = allCats();
+  const rows = sortedItems().sort((a, b) => order.indexOf(a.kategorie) - order.indexOf(b.kategorie));
+  const lines = ['Name;Kategorie;Stückzahl;Kennwerte'].concat(rows.map(i => [i.name, i.kategorie, i.stueckzahl, i.kennwerte].map(q).join(';')));
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  shareOrDownload(blob, `diyPOOL-Inventar-${stamp()}.csv`).then(ok => { if (ok) toast('CSV erstellt.'); });
+}
+
+/* =========================================================
+   Einstellungen
+   ========================================================= */
+async function renderSettings() {
+  const v = $('#setView');
+  const s = state.settings;
+  const counts = {};
+  state.items.forEach(i => { counts[i.kategorie] = (counts[i.kategorie] || 0) + 1; });
+  let used = 0;
+  try { Object.values(K).forEach(k => { used += (localStorage.getItem(k) || '').length; }); } catch (e) { /* ignorieren */ }
+
+  v.innerHTML = `
+    <div class="card">
+      <h3>KI-Zugang</h3>
+      <div class="field"><span>Anthropic-API-Schlüssel</span>
+        <div class="inline"><input id="setKey" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="sk-ant-…">
+        <button type="button" class="btn small" id="setKeyShow">Zeigen</button></div></div>
+      <p class="small muted" style="margin:-4px 2px 0">Der Schlüssel bleibt nur auf diesem Gerät und ist nicht im Backup enthalten.</p>
+      <div class="btnrow"><button type="button" class="btn" id="setTest">Testen</button><button type="button" class="btn primary" id="setKeySave">Speichern</button></div>
+      <div style="height:14px"></div>
+      <label class="field"><span>Modell</span><select id="setModel">${MODELS.map(m => `<option value="${m.id}"${s.model === m.id ? ' selected' : ''}>${esc(m.label)}</option>`).join('')}</select></label>
+      <label class="field" id="customWrap"${s.model === 'custom' ? '' : ' hidden'}><span>Eigene Modell-ID</span>
+        <input id="setCustom" type="text" value="${esc(s.customModel)}" placeholder="z. B. claude-sonnet-5-5" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    </div>
+
+    <div class="card">
+      <h3>Kategorien</h3>
+      ${state.categories.map((c, idx) => `<div class="catrow">
+        <span class="cn">${esc(c)}</span><span class="cc">${counts[c] || 0}</span>
+        <button type="button" class="iconbtn" data-catren="${idx}" aria-label="Kategorie umbenennen"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></button>
+        <button type="button" class="iconbtn danger" data-catdel="${idx}" aria-label="Kategorie löschen"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13"/></svg></button></div>`).join('')}
+      <div class="inline" style="margin-top:12px"><input id="catNew" type="text" placeholder="Neue Kategorie" autocomplete="off"><button type="button" class="btn small" id="catAdd">Hinzufügen</button></div>
+    </div>
+
+    <div class="card">
+      <h3>Backup</h3>
+      <div class="kv"><span>Letztes Backup</span><span>${fmtDate(state.meta.lastBackup)}</span></div>
+      <div class="kv"><span>Letzte Änderung</span><span>${fmtDate(state.meta.lastChange)}</span></div>
+      <div class="stack" style="margin-top:12px">
+        <button type="button" class="btn primary block" id="bkExport">Backup erstellen</button>
+        <label class="btn block" for="importInput">Backup wiederherstellen</label>
+        <button type="button" class="btn block" id="csvExport">Als CSV exportieren</button>
+      </div>
+      <p class="small muted" style="margin:10px 2px 0">Das Backup am besten in der Dateien-App in iCloud Drive sichern. Die CSV-Datei lässt sich am Mac in Numbers oder Excel öffnen.</p>
+    </div>
+
+    <div class="card">
+      <h3>Speicher</h3>
+      <div class="kv"><span>Einträge</span><span>${state.items.length}</span></div>
+      <div class="kv"><span>Belegter Speicher</span><span>ca. ${Math.max(1, Math.round(used / 1024))} KB</span></div>
+      <div class="kv"><span>Als App installiert</span><span>${isStandalone() ? 'ja' : 'nein'}</span></div>
+      <div class="kv"><span>Dauerhafter Speicher</span><span id="persistState">wird geprüft …</span></div>
+    </div>
+    <p class="small muted center">diyPOOL Version ${APP_VERSION} · Modell: ${esc(currentModel())}</p>`;
+
+  $('#setKey').value = s.apiKey || '';
+  const el = $('#persistState');
+  try {
+    const p = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : null;
+    if (el) el.textContent = p === null ? 'unbekannt' : p ? 'ja' : 'nicht bestätigt';
+  } catch (e) { if (el) el.textContent = 'unbekannt'; }
+}
+
+/* =========================================================
+   Ereignisse
+   ========================================================= */
+document.addEventListener('click', e => {
+  const tabBtn = e.target.closest('.tabbar button');
+  if (tabBtn) { showTab(tabBtn.dataset.tab); return; }
+
+  const go = e.target.closest('[data-go]');
+  if (go) { showTab(go.dataset.go); return; }
+
+  const q = e.target.closest('.qbtn');
+  if (q) {
+    const inp = document.getElementById(q.dataset.target);
+    if (inp) { inp.value = Math.max(0, toInt(inp.value) + Number(q.dataset.d)); inp.dispatchEvent(new Event('input', { bubbles: true })); }
+    return;
+  }
+
+  if (e.target.id === 'bannerBackup') { exportBackup(); return; }
+  if (e.target.id === 'sheetBg') { closeSheet(); return; }
+  if (e.target.id === 'hintClose') { state.meta.hintDismissed = true; store(K.meta, state.meta); renderInventory(); return; }
+});
+
+// Inventar
+$('#invSearch').addEventListener('input', e => { ui.search = e.target.value; renderInventoryList(); });
+$('#invChips').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  ui.filterCat = c.dataset.cat; renderInventory();
+});
+$('#invList').addEventListener('click', e => {
+  const act = e.target.closest('[data-act]');
+  const row = e.target.closest('.row');
+  if (!act || !row) return;
+  const it = byId(row.dataset.id); if (!it) return;
+  if (act.dataset.act === 'edit') { openItemEditor(it.id); return; }
+  const d = act.dataset.act === 'inc' ? 1 : -1;
+  if (it.stueckzahl + d < 0) return;
+  it.stueckzahl += d; it.geaendert = Date.now();
+  saveData();
+  row.querySelector('.qty').textContent = it.stueckzahl;
+  row.classList.toggle('zero', it.stueckzahl === 0);
+  row.querySelector('[data-act=dec]').disabled = it.stueckzahl === 0;
+  updateStats();
+});
+
+// Erfassen
+['camInput', 'libInput'].forEach(id => {
+  document.getElementById(id).addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (f) { if (ui.tab !== 'erfassen') showTab('erfassen'); handlePhoto(f); }
+  });
+});
+$('#capView').addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const act = a.dataset.act;
+  if (act === 'manual') {
+    const pre = cap.result ? { name: $('#capName') ? $('#capName').value : cap.result.name, kategorie: cap.result.kategorie, stueckzahl: cap.result.stueckzahl, kennwerte: cap.result.kennwerte } : null;
+    openItemEditor(null, pre);
+  }
+  else if (act === 'retry') runRecognition();
+  else if (act === 'discard') resetCapture();
+  else if (act === 'save') saveCapture();
+});
+$('#capView').addEventListener('change', e => { if (e.target.name === 'capMode' || e.target.id === 'capTarget') updateCaptureInfo(); });
+$('#capView').addEventListener('input', e => { if (e.target.id === 'capQty') updateCaptureInfo(); });
+
+// Prüfen
+$('#chkView').addEventListener('input', e => { if (e.target.id === 'chkText') chk.text = e.target.value; });
+$('#chkView').addEventListener('click', e => {
+  const m = e.target.closest('[data-mode]');
+  if (m) { chk.mode = m.dataset.mode; renderCheck(); return; }
+  if (e.target.id === 'chkRun') runCheck();
+  if (e.target.id === 'chkReset') { chk.text = ''; chk.result = null; chk.phase = 'idle'; chk.error = null; renderCheck(); window.scrollTo(0, 0); }
+});
+
+// Ideen
+$('#ideaView').addEventListener('input', e => { if (e.target.id === 'ideaWish') idea.wish = e.target.value; });
+$('#ideaView').addEventListener('click', e => {
+  const s = e.target.closest('[data-strict]');
+  if (s) { idea.strict = s.dataset.strict === '1'; renderIdeas(); return; }
+  if (e.target.id === 'ideaRun') runIdeas(false);
+  if (e.target.id === 'ideaMore') runIdeas(true);
+});
+
+// Einstellungen
+$('#setView').addEventListener('click', async e => {
+  const t = e.target.closest('button') || e.target;
+  if (t.id === 'setKeyShow') { const k = $('#setKey'); const show = k.type === 'password'; k.type = show ? 'text' : 'password'; t.textContent = show ? 'Verbergen' : 'Zeigen'; return; }
+  if (t.id === 'setKeySave') {
+    const key = $('#setKey').value.trim();
+    if (key && !key.startsWith('sk-ant-') && !confirm('Der Schlüssel beginnt nicht mit «sk-ant-». Trotzdem speichern?')) return;
+    state.settings.apiKey = key; saveSettings();
+    toast(key ? 'API-Schlüssel gespeichert.' : 'API-Schlüssel entfernt.');
+    return;
+  }
+  if (t.id === 'setTest') {
+    const key = $('#setKey').value.trim();
+    if (key !== state.settings.apiKey) { state.settings.apiKey = key; saveSettings(); }
+    t.disabled = true; t.textContent = 'Teste …';
+    try {
+      await callClaude({ content: [{ type: 'text', text: 'Antworte nur mit OK.' }], maxTokens: 16, timeoutMs: 30000 });
+      toast(`Verbindung erfolgreich (${currentModel()}).`);
+    } catch (err) { toast(err.message, true); }
+    t.disabled = false; t.textContent = 'Testen';
+    return;
+  }
+  if (t.dataset.catren !== undefined) {
+    const old = state.categories[Number(t.dataset.catren)];
+    const nn = prompt('Neuer Name für die Kategorie:', old);
+    if (nn === null) return;
+    const n = nn.trim();
+    if (!n || n === old) return;
+    if (state.categories.some(c => norm(c) === norm(n))) { alert('Diese Kategorie gibt es bereits.'); return; }
+    state.categories[Number(t.dataset.catren)] = n;
+    state.items.forEach(i => { if (i.kategorie === old) i.kategorie = n; });
+    if (ui.filterCat === old) ui.filterCat = n;
+    saveData(); renderSettings(); renderInventory();
+    return;
+  }
+  if (t.dataset.catdel !== undefined) {
+    const c = state.categories[Number(t.dataset.catdel)];
+    const n = state.items.filter(i => i.kategorie === c).length;
+    if (n) { alert(`Die Kategorie «${c}» wird von ${n} ${n === 1 ? 'Eintrag' : 'Einträgen'} verwendet. Ordne diese zuerst einer anderen Kategorie zu.`); return; }
+    if (state.categories.length <= 1) { alert('Mindestens eine Kategorie muss bestehen bleiben.'); return; }
+    if (!confirm(`Kategorie «${c}» löschen?`)) return;
+    state.categories.splice(Number(t.dataset.catdel), 1);
+    saveData(); renderSettings();
+    return;
+  }
+  if (t.id === 'catAdd') {
+    const n = $('#catNew').value.trim();
+    if (!n) return;
+    if (state.categories.some(c => norm(c) === norm(n))) { alert('Diese Kategorie gibt es bereits.'); return; }
+    state.categories.push(n); saveData(); renderSettings(); toast(`Kategorie «${n}» hinzugefügt.`);
+    return;
+  }
+  if (t.id === 'bkExport') { exportBackup(); return; }
+  if (t.id === 'csvExport') { exportCsv(); return; }
+});
+$('#setView').addEventListener('change', e => {
+  if (e.target.id === 'setModel') {
+    state.settings.model = e.target.value; saveSettings();
+    $('#customWrap').hidden = e.target.value !== 'custom';
+    toast(`Modell: ${currentModel()}`);
+  }
+  if (e.target.id === 'setCustom') { state.settings.customModel = e.target.value.trim(); saveSettings(); toast(`Modell: ${currentModel()}`); }
+});
+$('#importInput').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (f) importBackup(f);
+});
+
+/* =========================================================
+   Start
+   ========================================================= */
+updateBanner();
+renderInventory();
+if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(() => {}); }
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
