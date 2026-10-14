@@ -179,6 +179,27 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .parts .ps{flex:0 0 auto;font-size:13px;color:var(--muted)}
 
 /* Einstellungen */
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.ic.sm{width:22px;height:22px;color:var(--accent);margin-right:4px}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:560px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:120px;padding:18px 10px 14px;border:0;border-radius:16px;background:var(--card);box-shadow:var(--shadow);color:var(--text);transition:transform .1s}
+.tile .ic{width:40px;height:40px;stroke-width:1.4;color:var(--accent)}
+.tile span{font-size:15px;font-weight:400;line-height:1.25;text-align:center;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
+.tile:active{transform:scale(.97)}
+.crumbs{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+.crumb-back{width:38px;height:38px;border:0;border-radius:10px;background:var(--chip);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;color:var(--text)}
+.crumb-back .ic{width:20px;height:20px;stroke-width:2}
+.crumb-path{display:flex;flex-wrap:wrap;align-items:center;gap:0 4px;min-width:0}
+.crumb{background:none;border:0;padding:4px 1px;color:var(--accent);font-weight:600;font-size:14.5px}
+.crumb.cur{color:var(--text)}
+.crumbs .sep{color:var(--muted);font-size:14.5px}
+.iconsel{display:flex;align-items:center;gap:12px}
+.iconcur{width:52px;height:52px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center}
+.iconcur .ic{width:30px;height:30px}
+.iconpick{margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px}
+.pick{height:44px;border:1px solid var(--line);border-radius:10px;background:var(--input);display:flex;align-items:center;justify-content:center;color:var(--text);padding:0}
+.pick.on{border:2px solid var(--accent);background:var(--accent-soft);color:var(--accent)}
 .catrow{display:flex;align-items:center;gap:6px;padding:8px 0;border-top:1px solid var(--line)}
 .catrow:first-of-type{border-top:0}
 .catrow .cn{flex:1;min-width:0;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
@@ -230,7 +251,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
   <section id="tab-inventar" class="tab">
     <div id="installHint"></div>
     <div class="searchbar"><input id="invSearch" type="search" placeholder="Suchen nach Name oder Kennwerten" autocomplete="off" autocorrect="off" spellcheck="false"></div>
-    <div id="invChips" class="chips"></div>
+    <div id="invCrumbs"></div>
     <div id="invList"></div>
     <p id="invStats" class="stats"></p>
   </section>
@@ -283,7 +304,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 /* =========================================================
    Grundeinstellungen
    ========================================================= */
-const APP_VERSION = '1.2';
+const APP_VERSION = '1.3';
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 const DEFAULT_CATS = [
@@ -297,7 +318,7 @@ const MODELS = [
   { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (genau, teurer)' },
   { id: 'custom', label: 'Eigene Modell-ID' }
 ];
-const K = { items: 'diypool.items', cats: 'diypool.categories', settings: 'diypool.settings', meta: 'diypool.meta' };
+const K = { items: 'diypool.items', cats: 'diypool.categories', subcats: 'diypool.subcategories', icons: 'diypool.icons', settings: 'diypool.settings', meta: 'diypool.meta' };
 const TAB_TITLES = { inventar: 'Inventar', erfassen: 'Erfassen', pruefen: 'Material prüfen', ideen: 'Projektideen', einstellungen: 'Einstellungen' };
 
 /* =========================================================
@@ -335,11 +356,141 @@ function sanitizeItem(o) {
     id: String(o.id || uid()).slice(0, 40),
     name: String(o.name || '').trim().slice(0, 200),
     kategorie: String(o.kategorie || '').trim().slice(0, 80),
+    unterkategorie: String(o.unterkategorie || '').trim().slice(0, 80),
     stueckzahl: toInt(o.stueckzahl),
     kennwerte: String(o.kennwerte || '').trim().slice(0, 2000),
     erstellt: Number(o.erstellt) || Date.now(),
     geaendert: Number(o.geaendert) || Date.now()
   };
+}
+
+/* =========================================================
+   Symbole und Kategorienstruktur
+   ========================================================= */
+const ICONS = {
+  box: '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+  sonstiges: '<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="12" r=".9"/><circle cx="12" cy="12" r=".9"/><circle cx="16" cy="12" r=".9"/>',
+  passiv: '<rect x="6" y="9" width="12" height="6" rx="1"/><path d="M2 12h4M18 12h4"/>',
+  widerstand: '<rect x="5" y="8" width="14" height="8" rx="3"/><path d="M2 12h3M19 12h3M9 8v8M12 8v8M15 8v8"/>',
+  kondensator: '<path d="M2 12h8M14 12h8M10 5v14M14 5v14"/>',
+  spule: '<path d="M2 14h2a2.5 2.5 0 0 1 5 0a2.5 2.5 0 0 1 5 0a2.5 2.5 0 0 1 5 0h3"/>',
+  poti: '<rect x="6" y="9" width="12" height="6" rx="1"/><path d="M2 12h4M18 12h4M7 19 17 5M14 5h3v3"/>',
+  quarz: '<rect x="9" y="5" width="6" height="14" rx="1"/><path d="M2 12h4M18 12h4M6 7v10M18 7v10"/>',
+  halbleiter: '<path d="M2 12h6M16 12h6"/><path d="M8 6.5v11l8-5.5z"/><path d="M16 6.5v11"/>',
+  diode: '<rect x="5" y="9" width="14" height="6" rx="3"/><path d="M2 12h3M19 12h3M15 9v6"/>',
+  led: '<path d="M2 13h4M14 13h4"/><path d="M6 8v10l8-5z"/><path d="M14 8v10"/><path d="M13.5 6l3-3M16.5 3h-2.2M16.5 3v2.2M17 9l3-3M20 6h-2.2M20 6v2.2"/>',
+  transistor: '<circle cx="12" cy="12" r="9"/><path d="M3 12h6M9 7.5v9M9 10l5-3.5V3M9 14l5 3.5V21"/>',
+  ic: '<rect x="6" y="4" width="12" height="16" rx="1.5"/><path d="M3 8h3M3 12h3M3 16h3M18 8h3M18 12h3M18 16h3"/><path d="M10.5 4a1.5 1.5 0 0 0 3 0"/>',
+  regler: '<rect x="6" y="2" width="12" height="12" rx="1"/><circle cx="12" cy="6.5" r="1.6"/><path d="M6 10h12M8.5 14v8M12 14v8M15.5 14v8"/>',
+  module: '<rect x="6" y="6" width="12" height="12" rx="1.5"/><rect x="9.5" y="9.5" width="5" height="5" rx=".5"/><path d="M9 2.5V6M12 2.5V6M15 2.5V6M9 18v3.5M12 18v3.5M15 18v3.5M2.5 9H6M2.5 12H6M2.5 15H6M18 9h3.5M18 12h3.5M18 15h3.5"/>',
+  board: '<rect x="2" y="5" width="20" height="14" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><circle cx="5.5" cy="8.5" r=".6"/><circle cx="5.5" cy="12" r=".6"/><circle cx="5.5" cy="15.5" r=".6"/><circle cx="18.5" cy="8.5" r=".6"/><circle cx="18.5" cy="12" r=".6"/><circle cx="18.5" cy="15.5" r=".6"/>',
+  display: '<rect x="2" y="5" width="20" height="14" rx="2"/><rect x="5" y="8" width="14" height="8" rx="1"/>',
+  funk: '<path d="M2 7a14.5 14.5 0 0 1 20 0M5 10.5a10 10 0 0 1 14 0M8.2 14a5.5 5.5 0 0 1 7.6 0"/><circle cx="12" cy="18" r="1"/>',
+  breakout: '<rect x="4" y="3" width="16" height="13" rx="1.5"/><rect x="9" y="6.5" width="6" height="5" rx="1"/><path d="M7 16v5M10 16v5M14 16v5M17 16v5"/>',
+  sensoren: '<circle cx="12" cy="12" r="1.5"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/>',
+  temperatur: '<path d="M10 13.5V5a2 2 0 0 1 4 0v8.5a4 4 0 1 1-4 0z"/><path d="M12 10v6"/>',
+  licht: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  abstand: '<rect x="2" y="7" width="20" height="10" rx="2"/><circle cx="7.5" cy="12" r="2.5"/><circle cx="16.5" cy="12" r="2.5"/>',
+  lage: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="3.5"/><path d="M12 3v18"/>',
+  luft: '<path d="M9.59 4.59A2 2 0 1 1 11 8H2M12.59 19.41A2 2 0 1 0 14 16H2M17.73 7.73A2.5 2.5 0 1 1 19.5 12H2"/>',
+  aktoren: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  motor: '<circle cx="10" cy="12" r="7"/><path d="M17 12h5"/><path d="M7.5 14.5v-5l2.5 3 2.5-3v5"/>',
+  servo: '<rect x="3" y="9" width="18" height="10" rx="1.5"/><circle cx="8" cy="9" r="2.5"/><path d="M8 6.5V5M4 5h9"/>',
+  schrittmotor: '<rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/><circle cx="7" cy="7" r=".6"/><circle cx="17" cy="7" r=".6"/><circle cx="7" cy="17" r=".6"/><circle cx="17" cy="17" r=".6"/>',
+  relais: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 16h3l5-5M15 16h2M7 8h10"/>',
+  lautsprecher: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+  strom: '<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M21.5 10.5v3"/><path d="M8.5 12h4M10.5 10v4"/>',
+  akku: '<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M21.5 10.5v3"/><path d="M11.5 9l-2 3h3l-2 3"/>',
+  batterie: '<rect x="8" y="5" width="8" height="16" rx="1.5"/><path d="M10.5 5V3h3v2"/><path d="M12 9.5v3M10.5 11h3"/>',
+  netzteil: '<rect x="3" y="6" width="15" height="12" rx="2"/><path d="M11.5 8.5 9.5 12h3l-2 3.5"/><path d="M18 10h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2"/>',
+  wandler: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h9M14 8l2 2-2 2M17 14H8M10 12l-2 2 2 2"/>',
+  halter: '<rect x="2" y="6" width="20" height="12" rx="1.5"/><path d="M6 9v6M18 9v6M9 12h6"/>',
+  kabel: '<path d="M9 3v4M15 3v4"/><path d="M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/>',
+  jumper: '<path d="M5 18c0-7 14-5 14-12"/><rect x="3" y="18" width="4" height="4" rx=".5"/><rect x="17" y="2" width="4" height="4" rx=".5"/>',
+  draht: '<path d="M2 15c3.3-6 6.7-6 10 0s6.7 6 10 0"/><path d="M2 9c3.3 6 6.7 6 10 0s6.7-6 10 0"/>',
+  stecker: '<rect x="3" y="7" width="18" height="10" rx="1.5"/><circle cx="7" cy="12" r=".6"/><circle cx="10.3" cy="12" r=".6"/><circle cx="13.7" cy="12" r=".6"/><circle cx="17" cy="12" r=".6"/><path d="M9 17v3h6v-3"/>',
+  stiftleiste: '<rect x="2" y="12" width="20" height="5" rx="1"/><path d="M5 12V4M9.7 12V4M14.3 12V4M19 12V4M5 17v3M9.7 17v3M14.3 17v3M19 17v3"/>',
+  usb: '<path d="M12 21V5"/><path d="M9.5 7.5 12 5l2.5 2.5"/><path d="M12 16.5 7.5 14v-3M12 18.5l4.5-2.5v-2"/><circle cx="7.5" cy="10" r="1.2"/><path d="M15.5 12h2v2h-2z"/>',
+  mechanik: '<path d="M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5z"/><circle cx="12" cy="12" r="3.5"/>',
+  schraube: '<path d="M6 3h12l-2 4H8z"/><path d="M9.5 7v12l2.5 3 2.5-3V7"/><path d="M9.5 10l5 1.5M9.5 13.5l5 1.5M9.5 17l5 1.5"/>',
+  scheibe: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/>',
+  abstandshalter: '<rect x="8" y="6" width="8" height="12" rx="1"/><path d="M12 2v4M12 18v4M10.5 9v6M13.5 9v6"/>',
+  gehaeuse: '<path d="M2 4h20v4H2z"/><path d="M4 8v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/>',
+  werkzeug: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  loeten: '<path d="M3 21l3.5-3.5"/><path d="M6 15l3 3"/><path d="M8 13l3 3 7.5-7.5a2.1 2.1 0 0 0-3-3z"/><path d="M18.5 5.5 21 3"/>',
+  messgeraet: '<rect x="5" y="2" width="14" height="20" rx="2"/><rect x="8" y="5" width="8" height="5" rx="1"/><circle cx="12" cy="15.5" r="3"/><path d="M12 15.5l1.5-1.5"/>',
+  zange: '<path d="M14.5 9.5 21 3M9.5 9.5 3 3"/><circle cx="12" cy="12" r="1.5"/><path d="M10.9 13.1 6 21M13.1 13.1 18 21M9.5 9.5l1.4 1.4M14.5 9.5l-1.4 1.4"/>',
+  schraubendreher: '<path d="M15 3l6 6-3 3-6-6z"/><path d="M12 9l-7 7"/><path d="M3 21l1.2-3.6 2.4 2.4z"/>',
+  verbrauch: '<circle cx="10" cy="12" r="7"/><circle cx="10" cy="12" r="2.5"/><path d="M17 12h3.5v7"/>',
+  schrumpf: '<rect x="2" y="9" width="20" height="6" rx="3"/><path d="M7 9v6M17 9v6"/>',
+  kleber: '<path d="M6 21h12l-1.5-10h-9z"/><path d="M9 11V7h6v4"/><path d="M11 7V3h2v4"/>',
+  lochraster: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r=".6"/><circle cx="12" cy="8" r=".6"/><circle cx="16" cy="8" r=".6"/><circle cx="8" cy="12" r=".6"/><circle cx="12" cy="12" r=".6"/><circle cx="16" cy="12" r=".6"/><circle cx="8" cy="16" r=".6"/><circle cx="12" cy="16" r=".6"/><circle cx="16" cy="16" r=".6"/>'
+};
+const icon = (key, cls = '') => `<svg viewBox="0 0 24 24" class="ic${cls ? ' ' + cls : ''}" aria-hidden="true">${ICONS[key] || ICONS.box}</svg>`;
+
+const DEFAULT_TAX = [
+  ['Passive Bauteile', 'passiv', [['Widerstände', 'widerstand'], ['Kondensatoren', 'kondensator'], ['Spulen', 'spule'], ['Potentiometer', 'poti'], ['Quarze', 'quarz']]],
+  ['Halbleiter', 'halbleiter', [['LEDs', 'led'], ['Dioden', 'diode'], ['Transistoren', 'transistor'], ['ICs', 'ic'], ['Spannungsregler', 'regler']]],
+  ['Mikrocontroller und Module', 'module', [['Entwicklungsboards', 'board'], ['Displays', 'display'], ['Funkmodule', 'funk'], ['Treiber und Breakouts', 'breakout']]],
+  ['Sensoren', 'sensoren', [['Temperatur und Feuchte', 'temperatur'], ['Licht', 'licht'], ['Abstand und Bewegung', 'abstand'], ['Lage und Beschleunigung', 'lage'], ['Luftqualität', 'luft']]],
+  ['Aktoren und Motoren', 'aktoren', [['Gleichstrommotoren', 'motor'], ['Servos', 'servo'], ['Schrittmotoren', 'schrittmotor'], ['Relais', 'relais'], ['Summer und Lautsprecher', 'lautsprecher']]],
+  ['Stromversorgung und Akkus', 'strom', [['Akkus', 'akku'], ['Batterien', 'batterie'], ['Netzteile', 'netzteil'], ['Lade- und Spannungswandler', 'wandler'], ['Batteriehalter', 'halter']]],
+  ['Kabel und Steckverbinder', 'kabel', [['Jumper-Kabel', 'jumper'], ['Litzen und Drähte', 'draht'], ['Steckverbinder', 'stecker'], ['Stiftleisten', 'stiftleiste'], ['USB-Kabel', 'usb']]],
+  ['Mechanik und Befestigung', 'mechanik', [['Schrauben', 'schraube'], ['Muttern und Scheiben', 'scheibe'], ['Abstandshalter', 'abstandshalter'], ['Gehäuse', 'gehaeuse']]],
+  ['Werkzeug', 'werkzeug', [['Lötwerkzeug', 'loeten'], ['Messgeräte', 'messgeraet'], ['Zangen und Schneider', 'zange'], ['Schraubendreher', 'schraubendreher']]],
+  ['Verbrauchsmaterial', 'verbrauch', [['Lötzinn und Flussmittel', 'verbrauch'], ['Schrumpfschlauch', 'schrumpf'], ['Klebstoffe und Klebebänder', 'kleber'], ['Lochraster und Breadboards', 'lochraster']]]
+];
+const SONSTIGES = 'Sonstiges';
+const defaultTaxFor = cat => DEFAULT_TAX.find(t => norm(t[0]) === norm(cat));
+const validIcon = k => (k && ICONS[k]) ? k : 'box';
+
+function buildDefaultSubcats(cats) {
+  const out = {};
+  cats.forEach(c => { const d = defaultTaxFor(c); out[c] = d ? d[2].map(([name, ic]) => ({ name, icon: ic })) : []; });
+  return out;
+}
+function buildDefaultIcons(cats) {
+  const out = {};
+  cats.forEach(c => { const d = defaultTaxFor(c); out[c] = d ? d[1] : 'box'; });
+  return out;
+}
+function sanitizeSubcats(obj, cats) {
+  const out = {};
+  cats.forEach(c => {
+    const arr = obj && Array.isArray(obj[c]) ? obj[c] : null;
+    out[c] = arr ? arr.map(s => ({ name: String(s && s.name || '').trim().slice(0, 80), icon: validIcon(s && s.icon) })).filter(s => s.name && norm(s.name) !== norm(SONSTIGES)) : (defaultTaxFor(c) ? buildDefaultSubcats([c])[c] : []);
+  });
+  return out;
+}
+function sanitizeIcons(obj, cats) {
+  const out = {};
+  cats.forEach(c => { out[c] = obj && obj[c] ? validIcon(obj[c]) : buildDefaultIcons([c])[c]; });
+  return out;
+}
+
+function subsOf(cat) {
+  if (!state.subcats[cat]) state.subcats[cat] = [];
+  return state.subcats[cat];
+}
+const catIcon = cat => validIcon(state.catIcons[cat] || (defaultTaxFor(cat) || [])[1]);
+function subIcon(cat, sub) {
+  if (!sub) return 'sonstiges';
+  const s = subsOf(cat).find(x => x.name === sub);
+  return s ? validIcon(s.icon) : 'box';
+}
+function matchSub(cat, v) {
+  const n = norm(v);
+  if (!n || n === norm(SONSTIGES)) return '';
+  const s = subsOf(cat).find(x => norm(x.name) === n);
+  return s ? s.name : '';
+}
+function subOptions(cat, sel) {
+  const list = subsOf(cat).map(s => s.name);
+  if (sel && !list.includes(sel)) list.push(sel);
+  return list.map(n => `<option${n === sel ? ' selected' : ''}>${esc(n)}</option>`).join('') + `<option value=""${!sel ? ' selected' : ''}>${SONSTIGES}</option>`;
+}
+function subcatContext() {
+  return state.categories.map(c => `- ${c}: ${subsOf(c).length ? subsOf(c).map(s => s.name).join('; ') : '(keine)'}`).join('\n');
 }
 
 /* =========================================================
@@ -352,8 +503,17 @@ const state = {
   meta: Object.assign({ lastChange: 0, lastBackup: 0, hintDismissed: false }, load(K.meta, {}))
 };
 if (!state.categories.length) state.categories = DEFAULT_CATS.slice();
+{
+  const storedSub = load(K.subcats, null);
+  state.subcats = sanitizeSubcats(storedSub, state.categories);
+  state.catIcons = sanitizeIcons(load(K.icons, null), state.categories);
+  if (!storedSub) {
+    if (state.items.length) state.meta.subAssignPending = true;
+    store(K.subcats, state.subcats); store(K.icons, state.catIcons); store(K.meta, state.meta);
+  }
+}
 
-const ui = { tab: 'inventar', filterCat: 'Alle', search: '' };
+const ui = { tab: 'inventar', nav: { cat: null, sub: null }, search: '', assigning: false };
 
 const byId = id => id ? state.items.find(i => i.id === id) || null : null;
 const sortedItems = () => state.items.slice().sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' }));
@@ -365,7 +525,7 @@ function allCats() {
 
 function saveData() {
   const ok1 = store(K.items, state.items);
-  const ok2 = store(K.cats, state.categories);
+  const ok2 = store(K.cats, state.categories) && store(K.subcats, state.subcats) && store(K.icons, state.catIcons);
   state.meta.lastChange = Date.now();
   store(K.meta, state.meta);
   updateBanner();
@@ -420,64 +580,127 @@ function categoryOptions(sel) {
 /* =========================================================
    Inventar
    ========================================================= */
+const ICON_BACK = '<svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+
+function pendingSubItems() { return state.items.filter(i => !i.unterkategorie && subsOf(i.kategorie).length); }
+
 function renderInventory() {
-  // Installationshinweis
-  $('#installHint').innerHTML = (!isStandalone() && !state.meta.hintDismissed) ? `
+  const hints = [];
+  if (!isStandalone() && !state.meta.hintDismissed) hints.push(`
     <div class="card">
       <h3>Tipp: Als App installieren</h3>
       <p class="small" style="margin:0">In Safari unten auf <b>Teilen</b> tippen und <b>Zum Home-Bildschirm</b> wählen. Danach diyPOOL nur noch über das Symbol öffnen. Die installierte App und Safari haben nach meinem Kenntnisstand getrennte Speicher, darum erst nach der Installation Daten erfassen.</p>
       <button type="button" class="linkbtn" id="hintClose">Ausblenden</button>
-    </div>` : '';
-
-  const counts = {};
-  state.items.forEach(i => { counts[i.kategorie] = (counts[i.kategorie] || 0) + 1; });
-  const cats = allCats();
-  if (ui.filterCat !== 'Alle' && !counts[ui.filterCat]) ui.filterCat = 'Alle';
-
-  const chips = $('#invChips');
-  chips.hidden = state.items.length === 0;
-  chips.innerHTML = [`<button type="button" class="chip${ui.filterCat === 'Alle' ? ' on' : ''}" data-cat="Alle">Alle<span>${state.items.length}</span></button>`]
-    .concat(cats.filter(c => counts[c]).map(c => `<button type="button" class="chip${ui.filterCat === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c)}<span>${counts[c]}</span></button>`))
-    .join('');
-
+    </div>`);
+  const pend = pendingSubItems();
+  if (state.meta.subAssignPending && pend.length && ui.nav.cat === null && !ui.search.trim()) {
+    const noKey = !(state.settings.apiKey || '').trim();
+    hints.push(`<div class="card">
+      <h3>Unterkategorien zuordnen</h3>
+      ${ui.assigning
+        ? '<div class="spinner"></div><p class="small muted center" style="margin:0">Bauteile werden zugeordnet …</p>'
+        : `<p class="small" style="margin:0 0 10px">Die KI ordnet ${pend.length === 1 ? 'dein bestehendes Bauteil' : `deine ${pend.length} bestehenden Bauteile`} einmalig anhand der Namen den neuen Unterkategorien zu. Das kostet nur Bruchteile eines Rappens. Danach kannst du jede Zuordnung im Bearbeiten-Fenster ändern.</p>
+           ${noKey ? '<p class="note warn" style="margin:0 0 10px">Dafür braucht es zuerst den API-Schlüssel in den Einstellungen.</p>' : ''}
+           <div class="btnrow" style="margin-top:0"><button type="button" class="btn" id="subLater">Später</button>
+           ${noKey ? '<button type="button" class="btn primary" data-go="einstellungen">Einstellungen</button>' : '<button type="button" class="btn primary" id="subAssign">Jetzt zuordnen</button>'}</div>`}
+    </div>`);
+  }
+  $('#installHint').innerHTML = hints.join('');
   renderInventoryList();
+}
+
+function usedSubs(cat) {
+  const used = new Set(state.items.filter(i => i.kategorie === cat).map(i => i.unterkategorie || ''));
+  const order = subsOf(cat).map(s => s.name);
+  const res = order.filter(n => used.has(n));
+  [...used].filter(n => n && !order.includes(n)).sort((a, b) => a.localeCompare(b, 'de')).forEach(n => res.push(n));
+  if (used.has('')) res.push('');
+  return res;
+}
+
+function invLevel() {
+  const nav = ui.nav;
+  if (nav.cat !== null && !state.items.some(i => i.kategorie === nav.cat)) { nav.cat = null; nav.sub = null; }
+  if (nav.cat !== null && nav.sub !== null && !state.items.some(i => i.kategorie === nav.cat && (i.unterkategorie || '') === nav.sub)) nav.sub = null;
+  if (nav.cat === null) return 'root';
+  if (nav.sub !== null) return 'items';
+  return usedSubs(nav.cat).length >= 2 ? 'subs' : 'items';
+}
+
+function navUp() {
+  const nav = ui.nav;
+  if (nav.sub !== null) {
+    nav.sub = null;
+    if (usedSubs(nav.cat).length < 2) nav.cat = null;
+  } else nav.cat = null;
+  renderInventory(); window.scrollTo(0, 0);
+}
+
+function crumbsHtml(lvl) {
+  if (lvl === 'root') return '';
+  const { cat, sub } = ui.nav;
+  const parts = [`<button type="button" class="crumb" data-nav="root">Inventar</button>`];
+  if (sub === null) parts.push(`<span class="crumb cur">${esc(cat)}</span>`);
+  else parts.push(`<button type="button" class="crumb" data-nav="cat">${esc(cat)}</button>`, `<span class="crumb cur">${esc(sub || SONSTIGES)}</span>`);
+  return `<div class="crumbs"><button type="button" class="crumb-back" data-nav="up" aria-label="Zurück">${ICON_BACK}</button><div class="crumb-path">${parts.join('<span class="sep">›</span>')}</div></div>`;
 }
 
 function renderInventoryList() {
   const list = $('#invList');
+  const crumbs = $('#invCrumbs');
   const terms = norm(ui.search).split(' ').filter(Boolean);
-  const filtered = sortedItems().filter(it =>
-    (ui.filterCat === 'Alle' || it.kategorie === ui.filterCat) &&
-    terms.every(t => norm(it.name + ' ' + it.kennwerte + ' ' + it.kategorie).includes(t)));
 
   if (!state.items.length) {
+    crumbs.innerHTML = '';
     list.innerHTML = `<div class="card center">
       <h3>Noch keine Bauteile erfasst</h3>
-      <p class="lead">Fotografiere ein Bauteil, die KI schlägt Name, Kategorie, Stückzahl und Kennwerte vor.</p>
+      <p class="lead">Fotografiere Bauteile, die KI schlägt Name, Kategorie, Stückzahl und Kennwerte vor.</p>
       <button type="button" class="btn primary block" data-go="erfassen">Erstes Bauteil erfassen</button>
     </div>`;
-  } else if (!filtered.length) {
-    list.innerHTML = `<div class="card center muted">Keine Treffer.</div>`;
-  } else {
-    const groups = new Map();
-    filtered.forEach(it => {
-      const k = it.kategorie || 'Ohne Kategorie';
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(it);
-    });
-    const order = allCats().concat(['Ohne Kategorie']);
-    list.innerHTML = order.filter(c => groups.has(c)).map(c => `
-      <h3 class="grouphead">${esc(c)}</h3>
-      <div class="card flush">${groups.get(c).map(rowHtml).join('')}</div>`).join('');
+    $('#invStats').textContent = '';
+    return;
   }
-  updateStats();
+
+  if (terms.length) {
+    crumbs.innerHTML = '';
+    const filtered = sortedItems().filter(it => terms.every(t => norm([it.name, it.kennwerte, it.kategorie, it.unterkategorie || SONSTIGES].join(' ')).includes(t)));
+    if (!filtered.length) list.innerHTML = '<div class="card center muted">Keine Treffer.</div>';
+    else {
+      const groups = new Map();
+      filtered.forEach(it => { const k = it.kategorie || 'Ohne Kategorie'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); });
+      list.innerHTML = allCats().concat(['Ohne Kategorie']).filter(c => groups.has(c)).map(c => `
+        <h3 class="grouphead">${esc(c)}</h3>
+        <div class="card flush">${groups.get(c).map(it => rowHtml(it, true)).join('')}</div>`).join('');
+    }
+    $('#invStats').textContent = `${filtered.length} ${filtered.length === 1 ? 'Treffer' : 'Treffer'}`;
+    return;
+  }
+
+  const lvl = invLevel();
+  crumbs.innerHTML = crumbsHtml(lvl);
+  const { cat, sub } = ui.nav;
+  let scope = state.items;
+
+  if (lvl === 'root') {
+    const cats = allCats().filter(c => state.items.some(i => i.kategorie === c));
+    list.innerHTML = `<div class="tiles">${cats.map(c => `<button type="button" class="tile" data-navcat="${esc(c)}">${icon(catIcon(c))}<span>${esc(c)}</span></button>`).join('')}</div>`;
+  } else if (lvl === 'subs') {
+    scope = state.items.filter(i => i.kategorie === cat);
+    list.innerHTML = `<div class="tiles">${usedSubs(cat).map(s => `<button type="button" class="tile" data-navsub="${esc(s)}">${icon(subIcon(cat, s))}<span>${esc(s || SONSTIGES)}</span></button>`).join('')}</div>`;
+  } else {
+    scope = sortedItems().filter(i => i.kategorie === cat && (sub === null || (i.unterkategorie || '') === sub));
+    list.innerHTML = `<div class="card flush">${scope.map(it => rowHtml(it, false)).join('')}</div>`;
+  }
+  const total = scope.reduce((s, i) => s + i.stueckzahl, 0);
+  $('#invStats').textContent = `${scope.length} ${scope.length === 1 ? 'Eintrag' : 'Einträge'} · ${total} Stück${lvl === 'root' ? ' insgesamt' : ''}`;
 }
 
-function rowHtml(it) {
+function rowHtml(it, showPath) {
+  const sub = [it.kennwerte ? it.kennwerte.replace(/\s+/g, ' ') : '', showPath && it.unterkategorie ? it.unterkategorie : ''].filter(Boolean).join(' · ');
   return `<div class="row${it.stueckzahl === 0 ? ' zero' : ''}" data-id="${esc(it.id)}">
     <button type="button" class="row-main" data-act="edit">
       <span class="row-name">${esc(it.name)}</span>
-      ${it.kennwerte ? `<span class="row-sub">${esc(it.kennwerte.replace(/\s+/g, ' '))}</span>` : ''}
+      ${sub ? `<span class="row-sub">${esc(sub)}</span>` : ''}
     </button>
     <div class="stepper">
       <button type="button" data-act="dec" aria-label="Eins weniger"${it.stueckzahl === 0 ? ' disabled' : ''}>&minus;</button>
@@ -487,29 +710,29 @@ function rowHtml(it) {
   </div>`;
 }
 
-function updateStats() {
-  const total = state.items.reduce((s, i) => s + i.stueckzahl, 0);
-  $('#invStats').textContent = state.items.length ? `${state.items.length} Einträge · ${total} Stück insgesamt` : '';
-}
+function updateStats() { renderInventoryList(); }
 
 function openItemEditor(id, prefill) {
   const it = byId(id);
   const isNew = !it;
-  const v = it || Object.assign({ name: '', kategorie: state.categories[0], stueckzahl: 1, kennwerte: '' }, prefill || {});
+  const defCat = ui.nav.cat || state.categories[0];
+  const v = it || Object.assign({ name: '', kategorie: defCat, unterkategorie: ui.nav.cat && ui.nav.sub ? ui.nav.sub : '', stueckzahl: 1, kennwerte: '' }, prefill || {});
   openSheet(`
     <h2>${isNew ? 'Bauteil manuell hinzufügen' : 'Eintrag bearbeiten'}</h2>
     <label class="field"><span>Name</span><input id="edName" type="text" value="${esc(v.name)}" autocomplete="off" placeholder="z. B. Widerstand 220 Ω"></label>
     <label class="field"><span>Kategorie</span><select id="edCat">${categoryOptions(v.kategorie)}</select></label>
+    <label class="field"><span>Unterkategorie</span><select id="edSub">${subOptions(v.kategorie, v.unterkategorie || '')}</select></label>
     <div class="field"><span>Stückzahl</span>${qtyHtml('edQty', v.stueckzahl)}</div>
     <label class="field"><span>Technische Kennwerte</span><textarea id="edKenn" rows="3" placeholder="z. B. 0.25 W, 5 %, bedrahtet">${esc(v.kennwerte)}</textarea></label>
     <div class="btnrow"><button type="button" class="btn" id="edCancel">Abbrechen</button><button type="button" class="btn primary" id="edSave">Speichern</button></div>
     ${isNew ? '' : '<button type="button" class="btn danger block" id="edDelete">Eintrag löschen</button>'}
   `, body => {
+    $('#edCat', body).onchange = e => { $('#edSub', body).innerHTML = subOptions(e.target.value, matchSub(e.target.value, $('#edSub', body).value)); };
     $('#edCancel', body).onclick = closeSheet;
     $('#edSave', body).onclick = () => {
       const name = $('#edName', body).value.trim();
       if (!name) { alert('Bitte einen Namen eingeben.'); return; }
-      const data = { name, kategorie: $('#edCat', body).value, stueckzahl: readQty('edQty'), kennwerte: $('#edKenn', body).value.trim() };
+      const data = { name, kategorie: $('#edCat', body).value, unterkategorie: $('#edSub', body).value, stueckzahl: readQty('edQty'), kennwerte: $('#edKenn', body).value.trim() };
       if (isNew) {
         const dup = state.items.find(i => norm(i.name) === norm(name));
         if (dup && !confirm(`Es gibt bereits einen Eintrag «${dup.name}» (${dup.stueckzahl} Stk.). Trotzdem einen neuen Eintrag anlegen?`)) return;
@@ -527,6 +750,64 @@ function openItemEditor(id, prefill) {
       saveData(); closeSheet(); renderInventory(); toast('Eintrag gelöscht.');
     };
   });
+}
+
+/* Einmalige Zuordnung bestehender Bauteile zu Unterkategorien */
+const ASSIGN_SYSTEM = `Du ordnest Bauteile eines privaten Elektronik- und Werkzeuglagers Unterkategorien zu.
+Für jedes Bauteil wählst du genau eine Unterkategorie aus der Liste seiner eigenen Kategorie. Schreibe den Namen der Unterkategorie exakt wie in der Liste.
+Passt keine Unterkategorie eindeutig, gib einen leeren String zurück, dann bleibt das Bauteil in «Sonstiges». Rate nicht.
+Gib für jedes Bauteil die ID unverändert zurück.`;
+
+function assignTool() {
+  return {
+    name: 'unterkategorien_zuordnen',
+    input_schema: {
+      type: 'object',
+      properties: {
+        zuordnungen: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { id: { type: 'string' }, unterkategorie: { type: 'string', description: 'Name aus der Liste der Kategorie, sonst leer' } },
+            required: ['id', 'unterkategorie']
+          }
+        }
+      },
+      required: ['zuordnungen']
+    }
+  };
+}
+
+async function assignSubcategories() {
+  const todo = pendingSubItems();
+  if (!todo.length) { state.meta.subAssignPending = false; store(K.meta, state.meta); toast('Alle Bauteile sind bereits zugeordnet.'); renderInventory(); return; }
+  ui.assigning = true; renderInventory();
+  if (ui.tab === 'einstellungen') renderSettings();
+  let done = 0;
+  try {
+    for (let i = 0; i < todo.length; i += 120) {
+      const chunk = todo.slice(i, i + 120);
+      const r = await callClaude({
+        system: ASSIGN_SYSTEM, tool: assignTool(), maxTokens: 16000, timeoutMs: 240000,
+        content: [{ type: 'text', text: `Unterkategorien je Kategorie:\n${subcatContext()}\n\nBauteile (ID | Name | Kategorie | Kennwerte):\n${chunk.map(it => `[${it.id}] ${it.name} | ${it.kategorie}${it.kennwerte ? ' | ' + it.kennwerte.replace(/\s+/g, ' ') : ''}`).join('\n')}` }]
+      });
+      (Array.isArray(r.zuordnungen) ? r.zuordnungen : []).forEach(z => {
+        const it = byId(String(z.id || '').replace(/^\[|\]$/g, ''));
+        if (!it || it.unterkategorie) return;
+        const m = matchSub(it.kategorie, z.unterkategorie);
+        if (m) { it.unterkategorie = m; it.geaendert = Date.now(); done++; }
+      });
+    }
+    state.meta.subAssignPending = false;
+    toast(`${done} von ${todo.length} Bauteilen zugeordnet.${done < todo.length ? ' Der Rest bleibt in «Sonstiges».' : ''}`);
+  } catch (e) {
+    toast(e instanceof AppError ? e.message : 'Unerwarteter Fehler: ' + e.message, true);
+  } finally {
+    ui.assigning = false;
+    saveData();
+    renderInventory();
+    if (ui.tab === 'einstellungen') renderSettings();
+  }
 }
 
 /* =========================================================
@@ -663,7 +944,7 @@ Das Foto kann einen einzigen oder mehrere verschiedene Bauteiltypen zeigen.
 Vorgehen:
 1. Unterscheide alle Bauteiltypen auf dem Foto. Jeder Typ wird ein eigener Eintrag in bauteile. Trenne nach allem, was für ein Inventar wichtig ist: LEDs nach Farbe, Grösse und Bauform, Widerstände nach Wert, Kondensatoren nach Kapazität, Schrauben nach Gewinde und Länge, Module nach Typ. Gleiche Teile fasst du in einem Eintrag zusammen. Jedes Teil wird nur in einem Eintrag gezählt.
 2. Gib jedem Typ eine kurze, eindeutige deutsche Bezeichnung, wie man sie in einem Inventar verwendet, z. B. «Widerstand 220 Ω», «LED rot 5 mm», «ESP32-DevKitC V4», «Zylinderkopfschraube M3×10». Verwende die Schweizer Schreibweise (ss statt ß).
-3. Wähle pro Typ die passendste Kategorie aus der vorgegebenen Liste.
+3. Wähle pro Typ die passendste Kategorie aus der vorgegebenen Liste und dazu die passendste Unterkategorie aus der Liste dieser Kategorie. Passt keine Unterkategorie eindeutig, setze unterkategorie auf einen leeren String.
 4. Zähle pro Typ die sichtbaren Exemplare. Wenn Teile verdeckt, gestapelt oder verpackt sind, schätze und setze zaehlung auf «geschaetzt» oder bei grosser Unsicherheit auf «unsicher». Steht auf einer Verpackung eine Menge, darfst du diese verwenden und das im Hinweis erwähnen.
 5. Notiere pro Typ technische Kennwerte, die auf dem Foto tatsächlich erkennbar sind (Aufdruck, Bauform, Gewinde, Länge, Farbringe). Erfinde nichts. Was nicht erkennbar ist, lässt du weg. Ist ein Wert nur vermutet, schreibe «vermutlich» davor. Farben von Widerstandsringen sind auf Fotos oft verfälscht: Gib einen Widerstandswert nur an, wenn die Ringe klar lesbar sind, sonst weise darauf hin.
 6. Beschreibe in ort kurz, wo der Typ auf dem Foto liegt (z. B. «oben links», «mittlere Reihe»), damit die Person die Einträge auf dem Foto wiederfindet. Ordne die Einträge von oben links nach unten rechts.
@@ -687,6 +968,7 @@ function recognitionTool() {
             properties: {
               name: { type: 'string', description: 'Kurze deutsche Inventarbezeichnung' },
               kategorie: { type: 'string', enum: state.categories.slice() },
+              unterkategorie: { type: 'string', description: 'Name aus der Unterkategorien-Liste der Kategorie, sonst leer' },
               stueckzahl: { type: 'integer', minimum: 0 },
               zaehlung: { type: 'string', enum: ['gezaehlt', 'geschaetzt', 'unsicher'] },
               kennwerte: { type: 'string', description: 'Erkennbare technische Kennwerte, sonst leer' },
@@ -694,7 +976,7 @@ function recognitionTool() {
               match_id: { type: 'string', description: 'ID eines identischen bestehenden Inventareintrags, sonst leerer String' },
               hinweis: { type: 'string', description: 'Kurzer Hinweis zu Unsicherheiten bei diesem Typ, sonst leer' }
             },
-            required: ['name', 'kategorie', 'stueckzahl', 'zaehlung', 'kennwerte', 'ort', 'match_id', 'hinweis']
+            required: ['name', 'kategorie', 'unterkategorie', 'stueckzahl', 'zaehlung', 'kennwerte', 'ort', 'match_id', 'hinweis']
           }
         }
       },
@@ -724,7 +1006,7 @@ async function handlePhoto(file) {
 }
 
 function emptyCapItem() {
-  return { sel: true, name: '', kategorie: state.categories[0], stueckzahl: 1, zaehlung: 'unsicher', kennwerte: '', ort: '', hinweis: '', matched: false, mode: 'new', target: '' };
+  return { sel: true, name: '', kategorie: state.categories[0], unterkategorie: '', stueckzahl: 1, zaehlung: 'unsicher', kennwerte: '', ort: '', hinweis: '', matched: false, mode: 'new', target: '' };
 }
 
 async function runRecognition() {
@@ -738,16 +1020,18 @@ async function runRecognition() {
       timeoutMs: 180000,
       content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: cap.b64 } },
-        { type: 'text', text: `Kategorien: ${state.categories.join('; ')}\n\nAktuelles Inventar (ID | Name | Kategorie | Stückzahl | Kennwerte):\n${inventoryContext()}` }
+        { type: 'text', text: `Kategorien: ${state.categories.join('; ')}\n\nUnterkategorien je Kategorie:\n${subcatContext()}\n\nAktuelles Inventar (ID | Name | Kategorie | Stückzahl | Kennwerte):\n${inventoryContext()}` }
       ]
     });
     const list = Array.isArray(r.bauteile) ? r.bauteile : [];
     const hasInv = state.items.length > 0;
     cap.items = list.map(b => {
+      const kat = matchCategory(b.kategorie) || state.categories[0];
       const it = {
         sel: true,
         name: String(b.name || '').trim(),
-        kategorie: matchCategory(b.kategorie) || state.categories[0],
+        kategorie: kat,
+        unterkategorie: matchSub(kat, b.unterkategorie),
         stueckzahl: toInt(b.stueckzahl),
         zaehlung: ['gezaehlt', 'geschaetzt', 'unsicher'].includes(String(b.zaehlung || '').toLowerCase()) ? String(b.zaehlung).toLowerCase() : 'unsicher',
         kennwerte: String(b.kennwerte || '').trim(),
@@ -788,6 +1072,7 @@ function capItemHtml(it, i, hasInv, targetList) {
       <div class="capfields">
         <label class="field"><span>Name</span><input type="text" data-f="name" value="${esc(it.name)}" autocomplete="off"></label>
         <label class="field"><span>Kategorie</span><select data-f="kategorie">${categoryOptions(it.kategorie)}</select></label>
+        <label class="field"><span>Unterkategorie</span><select data-f="unterkategorie">${subOptions(it.kategorie, it.unterkategorie)}</select></label>
       </div>
       <div class="field"><span>Stückzahl ${cap.erkannt ? `<span class="badge ${z[0]}">${z[1]}</span>` : ''}</span>${qtyHtml('capQty-' + i, it.stueckzahl)}</div>
       <label class="field capkenn"><span>Technische Kennwerte</span><textarea data-f="kennwerte" rows="2">${esc(it.kennwerte)}</textarea></label>
@@ -914,7 +1199,7 @@ function saveCapture() {
       t.stueckzahl += it.stueckzahl; t.geaendert = Date.now(); added++;
       last = `${t.name}: +${it.stueckzahl} (jetzt ${t.stueckzahl} Stk.)`;
     } else {
-      const n = sanitizeItem({ id: uid(), name: it.name.trim(), kategorie: it.kategorie, stueckzahl: it.stueckzahl, kennwerte: it.kennwerte.trim() });
+      const n = sanitizeItem({ id: uid(), name: it.name.trim(), kategorie: it.kategorie, unterkategorie: it.unterkategorie, stueckzahl: it.stueckzahl, kennwerte: it.kennwerte.trim() });
       state.items.push(n); created++;
       last = `Gespeichert: ${n.name} (${n.stueckzahl} Stk.)`;
     }
@@ -1200,7 +1485,7 @@ async function shareOrDownload(blob, filename) {
 }
 
 async function exportBackup() {
-  const data = { app: 'diyPOOL', format: 1, version: APP_VERSION, exportiert: new Date().toISOString(), kategorien: state.categories, inventar: state.items };
+  const data = { app: 'diyPOOL', format: 2, version: APP_VERSION, exportiert: new Date().toISOString(), kategorien: state.categories, unterkategorien: state.subcats, symbole: state.catIcons, inventar: state.items };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const ok = await shareOrDownload(blob, `diyPOOL-Backup-${stamp()}.json`);
   if (ok) {
@@ -1225,6 +1510,10 @@ async function importBackup(file) {
   const seen = new Set();
   items.forEach(i => { while (seen.has(i.id)) i.id = uid(); seen.add(i.id); });
   state.items = items; state.categories = cats;
+  state.subcats = sanitizeSubcats(data.unterkategorien || null, cats);
+  state.catIcons = sanitizeIcons(data.symbole || null, cats);
+  state.meta.subAssignPending = !data.unterkategorien && items.length > 0;
+  ui.nav = { cat: null, sub: null };
   saveData();
   state.meta.lastBackup = state.meta.lastChange;
   store(K.meta, state.meta);
@@ -1237,9 +1526,131 @@ function exportCsv() {
   const q = s => { s = String(s ?? ''); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const order = allCats();
   const rows = sortedItems().sort((a, b) => order.indexOf(a.kategorie) - order.indexOf(b.kategorie));
-  const lines = ['Name;Kategorie;Stückzahl;Kennwerte'].concat(rows.map(i => [i.name, i.kategorie, i.stueckzahl, i.kennwerte].map(q).join(';')));
+  const lines = ['Name;Kategorie;Unterkategorie;Stückzahl;Kennwerte'].concat(rows.map(i => [i.name, i.kategorie, i.unterkategorie || SONSTIGES, i.stueckzahl, i.kennwerte].map(q).join(';')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   shareOrDownload(blob, `diyPOOL-Inventar-${stamp()}.csv`).then(ok => { if (ok) toast('CSV erstellt.'); });
+}
+
+/* =========================================================
+   Kategorien und Unterkategorien bearbeiten
+   ========================================================= */
+const ICON_EDIT = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>';
+
+function iconPickerHtml(sel) {
+  return `<div class="iconsel"><span class="iconcur">${icon(sel)}</span><button type="button" class="btn small" data-togglepick>Symbol ändern</button></div>
+    <div class="iconpick" hidden>${Object.keys(ICONS).map(k => `<button type="button" class="pick${k === sel ? ' on' : ''}" data-icon="${k}" aria-label="Symbol ${k}">${icon(k)}</button>`).join('')}</div>`;
+}
+function bindIconPicker(root, onPick) {
+  const grid = root.querySelector('.iconpick');
+  const tgl = root.querySelector('[data-togglepick]');
+  if (tgl) tgl.onclick = () => { grid.hidden = !grid.hidden; tgl.textContent = grid.hidden ? 'Symbol ändern' : 'Auswahl schliessen'; };
+  root.querySelectorAll('.pick').forEach(b => b.onclick = () => {
+    root.querySelectorAll('.pick').forEach(x => x.classList.toggle('on', x === b));
+    const cur = root.querySelector('.iconcur'); if (cur) cur.innerHTML = icon(b.dataset.icon);
+    grid.hidden = true; if (tgl) tgl.textContent = 'Symbol ändern';
+    onPick(b.dataset.icon);
+  });
+}
+
+function renameCategory(old, n) {
+  const idx = state.categories.indexOf(old);
+  if (idx < 0) return;
+  state.categories[idx] = n;
+  state.items.forEach(i => { if (i.kategorie === old) i.kategorie = n; });
+  state.subcats[n] = state.subcats[old] || []; delete state.subcats[old];
+  state.catIcons[n] = state.catIcons[old] || 'box'; delete state.catIcons[old];
+  if (ui.nav.cat === old) ui.nav.cat = n;
+}
+
+function openCategoryEditor(cat) {
+  const draft = { name: cat, icon: catIcon(cat) };
+  const count = (c, s) => state.items.filter(i => i.kategorie === c && (s === undefined || (i.unterkategorie || '') === s)).length;
+
+  const showMain = () => {
+    const c = cat;
+    openSheet(`
+      <h2>Kategorie bearbeiten</h2>
+      <label class="field"><span>Name</span><input id="ceName" type="text" value="${esc(draft.name)}" autocomplete="off"></label>
+      <div class="field"><span>Symbol</span>${iconPickerHtml(draft.icon)}</div>
+      <div class="field"><span>Unterkategorien</span>
+        ${subsOf(c).map((s, idx) => `<div class="catrow">${icon(validIcon(s.icon), 'sm')}<span class="cn">${esc(s.name)}</span><span class="cc">${count(c, s.name)}</span>
+          <button type="button" class="iconbtn" data-subedit="${idx}" aria-label="Unterkategorie bearbeiten">${ICON_EDIT}</button></div>`).join('')}
+        <div class="catrow">${icon('sonstiges', 'sm')}<span class="cn muted">${SONSTIGES} (fest)</span><span class="cc">${count(c, '')}</span></div>
+        <div class="inline" style="margin-top:10px"><input id="ceSubNew" type="text" placeholder="Neue Unterkategorie" autocomplete="off"><button type="button" class="btn small" id="ceSubAdd">Hinzufügen</button></div>
+      </div>
+      <div class="btnrow"><button type="button" class="btn" id="ceCancel">Abbrechen</button><button type="button" class="btn primary" id="ceSave">Speichern</button></div>
+      <button type="button" class="btn danger block" id="ceDelete">Kategorie löschen</button>
+    `, body => {
+      bindIconPicker(body, k => { draft.icon = k; });
+      $('#ceName', body).oninput = e => { draft.name = e.target.value; };
+      $('#ceCancel', body).onclick = closeSheet;
+      $('#ceSave', body).onclick = () => {
+        const n = draft.name.trim();
+        if (!n) { alert('Bitte einen Namen eingeben.'); return; }
+        if (n !== c && state.categories.some(x => norm(x) === norm(n))) { alert('Diese Kategorie gibt es bereits.'); return; }
+        if (n !== c) renameCategory(c, n);
+        state.catIcons[n] = draft.icon;
+        saveData(); closeSheet(); renderSettings(); renderInventory();
+      };
+      $('#ceDelete', body).onclick = () => {
+        const n = count(c);
+        if (n) { alert(`Die Kategorie «${c}» wird von ${n} ${n === 1 ? 'Eintrag' : 'Einträgen'} verwendet. Ordne diese zuerst einer anderen Kategorie zu.`); return; }
+        if (state.categories.length <= 1) { alert('Mindestens eine Kategorie muss bestehen bleiben.'); return; }
+        if (!confirm(`Kategorie «${c}» mit allen Unterkategorien löschen?`)) return;
+        state.categories = state.categories.filter(x => x !== c);
+        delete state.subcats[c]; delete state.catIcons[c];
+        saveData(); closeSheet(); renderSettings(); renderInventory();
+      };
+      $('#ceSubAdd', body).onclick = () => {
+        const n = $('#ceSubNew', body).value.trim();
+        if (!n) return;
+        if (norm(n) === norm(SONSTIGES) || subsOf(c).some(s => norm(s.name) === norm(n))) { alert('Diese Unterkategorie gibt es bereits.'); return; }
+        subsOf(c).push({ name: n, icon: 'box' });
+        saveData(); showMain(); renderInventory();
+      };
+      body.querySelectorAll('[data-subedit]').forEach(b => b.onclick = () => showSub(Number(b.dataset.subedit)));
+    });
+  };
+
+  const showSub = idx => {
+    const c = cat;
+    const s = subsOf(c)[idx];
+    if (!s) return showMain();
+    const sd = { name: s.name, icon: validIcon(s.icon) };
+    $('#sheetBody').innerHTML = `
+      <h2>Unterkategorie bearbeiten</h2>
+      <p class="small muted" style="margin:-8px 0 12px">${esc(c)}</p>
+      <label class="field"><span>Name</span><input id="seName" type="text" value="${esc(sd.name)}" autocomplete="off"></label>
+      <div class="field"><span>Symbol</span>${iconPickerHtml(sd.icon)}</div>
+      <div class="btnrow"><button type="button" class="btn" id="seBack">Zurück</button><button type="button" class="btn primary" id="seSave">Speichern</button></div>
+      <button type="button" class="btn danger block" id="seDelete">Unterkategorie löschen</button>`;
+    const body = $('#sheetBody');
+    $('.sheet-panel').scrollTop = 0;
+    bindIconPicker(body, k => { sd.icon = k; });
+    $('#seName', body).oninput = e => { sd.name = e.target.value; };
+    $('#seBack', body).onclick = showMain;
+    $('#seSave', body).onclick = () => {
+      const n = sd.name.trim();
+      if (!n) { alert('Bitte einen Namen eingeben.'); return; }
+      if (norm(n) === norm(SONSTIGES) || subsOf(c).some((x, i) => i !== idx && norm(x.name) === norm(n))) { alert('Diese Unterkategorie gibt es bereits.'); return; }
+      if (n !== s.name) {
+        state.items.forEach(i => { if (i.kategorie === c && i.unterkategorie === s.name) i.unterkategorie = n; });
+        if (ui.nav.cat === c && ui.nav.sub === s.name) ui.nav.sub = n;
+        s.name = n;
+      }
+      s.icon = sd.icon;
+      saveData(); showMain(); renderInventory();
+    };
+    $('#seDelete', body).onclick = () => {
+      const n = count(c, s.name);
+      if (!confirm(n ? `Unterkategorie «${s.name}» löschen? ${n} ${n === 1 ? 'Bauteil wird' : 'Bauteile werden'} nach «${SONSTIGES}» verschoben.` : `Unterkategorie «${s.name}» löschen?`)) return;
+      state.items.forEach(i => { if (i.kategorie === c && i.unterkategorie === s.name) i.unterkategorie = ''; });
+      subsOf(c).splice(idx, 1);
+      saveData(); showMain(); renderInventory();
+    };
+  };
+
+  showMain();
 }
 
 /* =========================================================
@@ -1250,6 +1661,7 @@ async function renderSettings() {
   const s = state.settings;
   const counts = {};
   state.items.forEach(i => { counts[i.kategorie] = (counts[i.kategorie] || 0) + 1; });
+  const pendCount = pendingSubItems().length;
   let used = 0;
   try { Object.values(K).forEach(k => { used += (localStorage.getItem(k) || '').length; }); } catch (e) { /* ignorieren */ }
 
@@ -1269,11 +1681,11 @@ async function renderSettings() {
 
     <div class="card">
       <h3>Kategorien</h3>
-      ${state.categories.map((c, idx) => `<div class="catrow">
-        <span class="cn">${esc(c)}</span><span class="cc">${counts[c] || 0}</span>
-        <button type="button" class="iconbtn" data-catren="${idx}" aria-label="Kategorie umbenennen"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></button>
-        <button type="button" class="iconbtn danger" data-catdel="${idx}" aria-label="Kategorie löschen"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13"/></svg></button></div>`).join('')}
+      ${state.categories.map(c => `<div class="catrow">${icon(catIcon(c), 'sm')}<span class="cn">${esc(c)}</span><span class="cc">${counts[c] || 0}</span>
+        <button type="button" class="iconbtn" data-catedit="${esc(c)}" aria-label="Kategorie bearbeiten">${ICON_EDIT}</button></div>`).join('')}
       <div class="inline" style="margin-top:12px"><input id="catNew" type="text" placeholder="Neue Kategorie" autocomplete="off"><button type="button" class="btn small" id="catAdd">Hinzufügen</button></div>
+      <p class="small muted" style="margin:10px 2px 0">Antippen des Stifts öffnet Name, Symbol und Unterkategorien der Kategorie.</p>
+      ${pendCount ? `<button type="button" class="btn block" id="setSubAssign" style="margin-top:12px"${ui.assigning ? ' disabled' : ''}>${ui.assigning ? 'Wird zugeordnet …' : `${pendCount} ${pendCount === 1 ? 'Bauteil' : 'Bauteile'} aus «Sonstiges» zuordnen lassen`}</button>` : ''}
     </div>
 
     <div class="card">
@@ -1310,7 +1722,10 @@ async function renderSettings() {
    ========================================================= */
 document.addEventListener('click', e => {
   const tabBtn = e.target.closest('.tabbar button');
-  if (tabBtn) { showTab(tabBtn.dataset.tab); return; }
+  if (tabBtn) {
+    if (tabBtn.dataset.tab === 'inventar' && ui.tab === 'inventar') { ui.nav = { cat: null, sub: null }; ui.search = ''; $('#invSearch').value = ''; }
+    showTab(tabBtn.dataset.tab); return;
+  }
 
   const go = e.target.closest('[data-go]');
   if (go) { showTab(go.dataset.go); return; }
@@ -1324,16 +1739,27 @@ document.addEventListener('click', e => {
 
   if (e.target.id === 'bannerBackup') { exportBackup(); return; }
   if (e.target.id === 'sheetBg') { closeSheet(); return; }
+  const bid = (e.target.closest('button') || {}).id;
+  if (bid === 'subLater') { state.meta.subAssignPending = false; store(K.meta, state.meta); renderInventory(); toast('Später möglich unter Einstellungen › Kategorien.'); return; }
+  if (bid === 'subAssign') { assignSubcategories(); return; }
   if (e.target.id === 'hintClose') { state.meta.hintDismissed = true; store(K.meta, state.meta); renderInventory(); return; }
 });
 
 // Inventar
 $('#invSearch').addEventListener('input', e => { ui.search = e.target.value; renderInventoryList(); });
-$('#invChips').addEventListener('click', e => {
-  const c = e.target.closest('.chip'); if (!c) return;
-  ui.filterCat = c.dataset.cat; renderInventory();
+$('#invCrumbs').addEventListener('click', e => {
+  const b = e.target.closest('[data-nav]'); if (!b) return;
+  const n = b.dataset.nav;
+  if (n === 'up') { navUp(); return; }
+  if (n === 'root') ui.nav = { cat: null, sub: null };
+  if (n === 'cat') ui.nav.sub = null;
+  renderInventory(); window.scrollTo(0, 0);
 });
 $('#invList').addEventListener('click', e => {
+  const tc = e.target.closest('[data-navcat]');
+  if (tc) { ui.nav = { cat: tc.dataset.navcat, sub: null }; renderInventory(); window.scrollTo(0, 0); return; }
+  const ts = e.target.closest('[data-navsub]');
+  if (ts) { ui.nav.sub = ts.dataset.navsub; renderInventory(); window.scrollTo(0, 0); return; }
   const act = e.target.closest('[data-act]');
   const row = e.target.closest('.row');
   if (!act || !row) return;
@@ -1382,7 +1808,13 @@ $('#capView').addEventListener('change', e => {
   const x = capItemFromEvent(e); if (!x) return;
   const f = e.target.dataset.f;
   if (f === 'sel') x.it.sel = e.target.checked;
-  else if (f === 'kategorie') x.it.kategorie = e.target.value;
+  else if (f === 'kategorie') {
+    x.it.kategorie = e.target.value;
+    x.it.unterkategorie = matchSub(x.it.kategorie, x.it.unterkategorie);
+    const ss = x.card.querySelector('[data-f=unterkategorie]');
+    if (ss) ss.innerHTML = subOptions(x.it.kategorie, x.it.unterkategorie);
+  }
+  else if (f === 'unterkategorie') x.it.unterkategorie = e.target.value;
   else if (f === 'mode') x.it.mode = e.target.value;
   else if (f === 'target') x.it.target = e.target.value;
   else return;
@@ -1429,34 +1861,14 @@ $('#setView').addEventListener('click', async e => {
     t.disabled = false; t.textContent = 'Testen';
     return;
   }
-  if (t.dataset.catren !== undefined) {
-    const old = state.categories[Number(t.dataset.catren)];
-    const nn = prompt('Neuer Name für die Kategorie:', old);
-    if (nn === null) return;
-    const n = nn.trim();
-    if (!n || n === old) return;
-    if (state.categories.some(c => norm(c) === norm(n))) { alert('Diese Kategorie gibt es bereits.'); return; }
-    state.categories[Number(t.dataset.catren)] = n;
-    state.items.forEach(i => { if (i.kategorie === old) i.kategorie = n; });
-    if (ui.filterCat === old) ui.filterCat = n;
-    saveData(); renderSettings(); renderInventory();
-    return;
-  }
-  if (t.dataset.catdel !== undefined) {
-    const c = state.categories[Number(t.dataset.catdel)];
-    const n = state.items.filter(i => i.kategorie === c).length;
-    if (n) { alert(`Die Kategorie «${c}» wird von ${n} ${n === 1 ? 'Eintrag' : 'Einträgen'} verwendet. Ordne diese zuerst einer anderen Kategorie zu.`); return; }
-    if (state.categories.length <= 1) { alert('Mindestens eine Kategorie muss bestehen bleiben.'); return; }
-    if (!confirm(`Kategorie «${c}» löschen?`)) return;
-    state.categories.splice(Number(t.dataset.catdel), 1);
-    saveData(); renderSettings();
-    return;
-  }
+  if (t.dataset && t.dataset.catedit !== undefined) { openCategoryEditor(t.dataset.catedit); return; }
+  if (t.id === 'setSubAssign') { assignSubcategories(); return; }
   if (t.id === 'catAdd') {
     const n = $('#catNew').value.trim();
     if (!n) return;
     if (state.categories.some(c => norm(c) === norm(n))) { alert('Diese Kategorie gibt es bereits.'); return; }
-    state.categories.push(n); saveData(); renderSettings(); toast(`Kategorie «${n}» hinzugefügt.`);
+    state.categories.push(n); state.subcats[n] = []; state.catIcons[n] = 'box';
+    saveData(); renderSettings(); toast(`Kategorie «${n}» hinzugefügt.`);
     return;
   }
   if (t.id === 'bkExport') { exportBackup(); return; }
